@@ -65,3 +65,7 @@ html, body {
 #btn-search:hover {
   background: #fdd835;
 }
+/* cursore selezione punto */
+.map-select-mode {
+  cursor: pointer !important;
+}

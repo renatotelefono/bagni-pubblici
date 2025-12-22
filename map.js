@@ -18,6 +18,14 @@ let markerPreview = null;         // punto selezionato
 let circlePreview = null;         // cerchio raggio
 let layerBagni = null;            // marker bagni
 
+function abilitaCursoreSelezione() {
+  map.getContainer().classList.add("map-select-mode");
+}
+
+function disabilitaCursoreSelezione() {
+  map.getContainer().classList.remove("map-select-mode");
+}
+
 /*************************************************
  * RAGGIO (TENDINA)
  *************************************************/
@@ -198,9 +206,12 @@ document.getElementById("btn-gps").addEventListener("click", () => {
  *************************************************/
 document.getElementById("btn-map").addEventListener("click", () => {
   modalitaSceltaMappa = true;
+  abilitaCursoreSelezione();
+
   document.getElementById("status").innerText =
     "🗺️ Tocca un punto sulla mappa";
 });
+
 
 /*************************************************
  * CLICK SULLA MAPPA
@@ -209,7 +220,7 @@ map.on("click", e => {
   if (!modalitaSceltaMappa) return;
 
   modalitaSceltaMappa = false;
-
+disabilitaCursoreSelezione(); // 👈 TORNA CURSORE NORMALE
   puntoRicerca = {
     lat: e.latlng.lat,
     lon: e.latlng.lng
