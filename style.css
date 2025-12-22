@@ -19,3 +19,25 @@ html, body {
 #map {
   height: calc(100% - 80px);
 }
+#controls {
+  padding: 8px;
+  background: #1976d2;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#controls button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: white;
+  color: #1976d2;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#controls button:hover {
+  background: #e3f2fd;
+}
