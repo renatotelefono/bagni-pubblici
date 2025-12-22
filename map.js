@@ -1,27 +1,45 @@
-// MAPPA BASE
-const map = L.map("map").setView([41.9028, 12.4964], 12);
+/*************************************************
+ * MAPPA BASE
+ *************************************************/
+const map = L.map("map").setView([41.9028, 12.4964], 12); // Roma fallback
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-let layerBagni;
-let markerCentro;
+/*************************************************
+ * VARIABILI GLOBALI
+ *************************************************/
+let layerBagni = null;
+let markerCentro = null;
 let modalitaSceltaMappa = false;
+let raggio = 3000; // default 3 km
 
-// =======================
-// FUNZIONE OVERPASS
-// =======================
+/*************************************************
+ * GESTIONE RAGGIO (TENDINA)
+ *************************************************/
+const radiusSelect = document.getElementById("radius");
+if (radiusSelect) {
+  raggio = Number(radiusSelect.value);
+
+  radiusSelect.addEventListener("change", e => {
+    raggio = Number(e.target.value);
+  });
+}
+
+/*************************************************
+ * FUNZIONE PRINCIPALE: CARICA BAGNI
+ *************************************************/
 function caricaBagni(lat, lon) {
-  document.getElementById("status").innerText =
-    "🔄 Caricamento bagni…";
-
+  // pulizia layer precedenti
   if (layerBagni) map.removeLayer(layerBagni);
   if (markerCentro) map.removeLayer(markerCentro);
 
+  // marker punto di ricerca
   markerCentro = L.circleMarker([lat, lon], {
     radius: 8,
     color: "red",
+    fillColor: "red",
     fillOpacity: 0.6
   })
     .addTo(map)
@@ -30,10 +48,13 @@ function caricaBagni(lat, lon) {
 
   map.setView([lat, lon], 15);
 
+  document.getElementById("status").innerText =
+    `🔄 Caricamento bagni (raggio ${raggio / 1000} km)…`;
+
   const query = `
 [out:json][timeout:25];
 (
-  node["amenity"="toilets"](around:3000,${lat},${lon});
+  node["amenity"="toilets"](around:${raggio},${lat},${lon});
 );
 out body;
 `;
@@ -45,26 +66,38 @@ out body;
     },
     body: "data=" + encodeURIComponent(query)
   })
-    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) throw new Error("Errore Overpass");
+      return res.json();
+    })
     .then(data => mostraBagni(data))
-    .catch(() => {
+    .catch(err => {
+      console.error("OVERPASS ERROR:", err);
       document.getElementById("status").innerText =
-        "❌ Errore nel caricamento";
+        "❌ Errore nel caricamento dei bagni";
     });
 }
 
-// =======================
-// MOSTRA BAGNI
-// =======================
+/*************************************************
+ * MOSTRA BAGNI SULLA MAPPA
+ *************************************************/
 function mostraBagni(data) {
   layerBagni = L.layerGroup();
 
   data.elements.forEach(el => {
-    if (el.lat && el.lon) {
-      L.marker([el.lat, el.lon])
-        .bindPopup("🚻 Bagno pubblico")
-        .addTo(layerBagni);
+    if (!el.lat || !el.lon) return;
+
+    let popup = "<strong>🚻 Bagno pubblico</strong><br>";
+
+    if (el.tags) {
+      if (el.tags.wheelchair === "yes") popup += "♿ Accessibile<br>";
+      if (el.tags.fee === "yes") popup += "💰 A pagamento<br>";
+      if (el.tags.fee === "no") popup += "Gratis<br>";
     }
+
+    L.marker([el.lat, el.lon])
+      .bindPopup(popup)
+      .addTo(layerBagni);
   });
 
   layerBagni.addTo(map);
@@ -73,14 +106,20 @@ function mostraBagni(data) {
     `🚻 Bagni trovati: ${data.elements.length}`;
 }
 
-// =======================
-// PULSANTE GPS
-// =======================
+/*************************************************
+ * PULSANTE: USA GPS
+ *************************************************/
 document.getElementById("btn-gps").addEventListener("click", () => {
   modalitaSceltaMappa = false;
 
   document.getElementById("status").innerText =
     "📍 Richiesta posizione GPS…";
+
+  if (!("geolocation" in navigator)) {
+    document.getElementById("status").innerText =
+      "❌ Geolocalizzazione non supportata";
+    return;
+  }
 
   navigator.geolocation.getCurrentPosition(
     pos => {
@@ -88,25 +127,30 @@ document.getElementById("btn-gps").addEventListener("click", () => {
       const lon = pos.coords.longitude;
       caricaBagni(lat, lon);
     },
-    () => {
+    err => {
+      console.error("GEO ERROR:", err);
       document.getElementById("status").innerText =
         "❌ Posizione non concessa";
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000
     }
   );
 });
 
-// =======================
-// PULSANTE MAPPA
-// =======================
+/*************************************************
+ * PULSANTE: SCEGLI SULLA MAPPA
+ *************************************************/
 document.getElementById("btn-map").addEventListener("click", () => {
   modalitaSceltaMappa = true;
   document.getElementById("status").innerText =
     "🗺️ Tocca un punto sulla mappa";
 });
 
-// =======================
-// CLICK SULLA MAPPA
-// =======================
+/*************************************************
+ * CLICK SULLA MAPPA
+ *************************************************/
 map.on("click", e => {
   if (!modalitaSceltaMappa) return;
 

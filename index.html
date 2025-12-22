@@ -7,8 +7,16 @@
 <div id="controls">
   <button id="btn-gps">📍 Usa la mia posizione</button>
   <button id="btn-map">🗺️ Scegli sulla mappa</button>
+
+  <select id="radius">
+    <option value="1000">1 km</option>
+    <option value="3000" selected>3 km</option>
+    <option value="5000">5 km</option>
+  </select>
+
   <div id="status">Scegli come cercare i bagni</div>
 </div>
+
 
   <!-- Leaflet -->
   <link
@@ -22,7 +30,7 @@
 
   <div id="header">
     <h1>🚻 Bagni Pubblici</h1>
-    <div id="status">📍 In attesa della posizione…</div>
+    
   </div>
 
   <div id="map"></div>
