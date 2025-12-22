@@ -15,6 +15,10 @@ let markerCentro = null;
 let modalitaSceltaMappa = false;
 let raggio = 3000;
 
+let markerPreview = null;
+let circlePreview = null;
+
+
 // punto selezionato (GPS o mappa)
 let puntoRicerca = null;
 
@@ -26,9 +30,47 @@ raggio = Number(radiusSelect.value);
 
 radiusSelect.addEventListener("change", e => {
   raggio = Number(e.target.value);
+
+  if (puntoRicerca) {
+    mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
+  }
+
   document.getElementById("status").innerText =
-    `Raggio impostato a ${raggio / 1000} km (premi Avvia ricerca)`;
+    `Raggio impostato a ${raggio / 1000} km – premi Avvia ricerca`;
 });
+
+
+
+
+
+function mostraAnteprima(lat, lon) {
+  // rimuove anteprima precedente
+  if (markerPreview) map.removeLayer(markerPreview);
+  if (circlePreview) map.removeLayer(circlePreview);
+
+  // marker punto scelto
+  markerPreview = L.circleMarker([lat, lon], {
+    radius: 8,
+    color: "orange",
+    fillColor: "orange",
+    fillOpacity: 0.8
+  })
+    .addTo(map)
+    .bindPopup("📍 Punto selezionato")
+    .openPopup();
+
+  // cerchio raggio
+  circlePreview = L.circle([lat, lon], {
+    radius: raggio,
+    color: "orange",
+    fillColor: "orange",
+    fillOpacity: 0.15
+  }).addTo(map);
+
+  map.setView([lat, lon], 15);
+}
+
+
 
 /*************************************************
  * FUNZIONE OVERPASS
@@ -132,13 +174,16 @@ document.getElementById("btn-gps").addEventListener("click", () => {
 
   navigator.geolocation.getCurrentPosition(
     pos => {
-      puntoRicerca = {
-        lat: pos.coords.latitude,
-        lon: pos.coords.longitude
-      };
+    puntoRicerca = {
+  lat: pos.coords.latitude,
+  lon: pos.coords.longitude
+};
 
-      document.getElementById("status").innerText =
-        "📍 Posizione acquisita (premi Avvia ricerca)";
+mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
+
+document.getElementById("status").innerText =
+  "📍 Posizione acquisita – premi Avvia ricerca";
+
     },
     () => {
       document.getElementById("status").innerText =
@@ -169,9 +214,13 @@ map.on("click", e => {
     lon: e.latlng.lng
   };
 
+  mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
+
   document.getElementById("status").innerText =
-    "📍 Punto selezionato (premi Avvia ricerca)";
+    "📍 Punto selezionato – premi Avvia ricerca";
 });
+
+
 
 /*************************************************
  * PULSANTE AVVIA RICERCA
