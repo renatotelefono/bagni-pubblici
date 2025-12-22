@@ -48,3 +48,20 @@ html, body {
   font-weight: bold;
   color: #1976d2;
 }
+#controls button,
+#controls select {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#btn-search {
+  background: #ffeb3b;
+  color: #333;
+}
+
+#btn-search:hover {
+  background: #fdd835;
+}
