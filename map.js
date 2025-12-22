@@ -59,7 +59,8 @@ function caricaBagni(lat, lon) {
 out body;
 `;
 
-  fetch("https://overpass-api.de/api/interpreter", {
+fetch("https://overpass.kumi.systems/api/interpreter", {
+
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
