@@ -1,7 +1,7 @@
 /*************************************************
  * MAPPA BASE
  *************************************************/
-const map = L.map("map").setView([41.9028, 12.4964], 12); // Roma fallback
+const map = L.map("map").setView([41.9028, 12.4964], 12); // fallback Roma
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
@@ -10,50 +10,47 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 /*************************************************
  * VARIABILI GLOBALI
  *************************************************/
-let layerBagni = null;
-let markerCentro = null;
+let raggio = 3000;                // metri
+let puntoRicerca = null;          // { lat, lon }
 let modalitaSceltaMappa = false;
-let raggio = 3000;
 
-let markerPreview = null;
-let circlePreview = null;
-
-
-// punto selezionato (GPS o mappa)
-let puntoRicerca = null;
+let markerPreview = null;         // punto selezionato
+let circlePreview = null;         // cerchio raggio
+let layerBagni = null;            // marker bagni
 
 /*************************************************
- * RAGGIO
+ * RAGGIO (TENDINA)
  *************************************************/
 const radiusSelect = document.getElementById("radius");
-raggio = Number(radiusSelect.value);
+if (radiusSelect) {
+  raggio = Number(radiusSelect.value);
 
-radiusSelect.addEventListener("change", e => {
-  raggio = Number(e.target.value);
+  radiusSelect.addEventListener("change", e => {
+    raggio = Number(e.target.value);
 
-  if (puntoRicerca) {
-    mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
-  }
+    if (puntoRicerca) {
+      mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
+    }
 
-  document.getElementById("status").innerText =
-    `Raggio impostato a ${raggio / 1000} km – premi Avvia ricerca`;
-});
+    document.getElementById("status").innerText =
+      `Raggio impostato a ${raggio / 1000} km – premi Avvia ricerca`;
+  });
+}
 
-
-
-
-
+/*************************************************
+ * ANTEPRIMA: PUNTO + CERCHIO
+ *************************************************/
 function mostraAnteprima(lat, lon) {
   // rimuove anteprima precedente
   if (markerPreview) map.removeLayer(markerPreview);
   if (circlePreview) map.removeLayer(circlePreview);
 
-  // marker punto scelto
+  // marker punto
   markerPreview = L.circleMarker([lat, lon], {
     radius: 8,
     color: "orange",
     fillColor: "orange",
-    fillOpacity: 0.8
+    fillOpacity: 0.9
   })
     .addTo(map)
     .bindPopup("📍 Punto selezionato")
@@ -70,36 +67,23 @@ function mostraAnteprima(lat, lon) {
   map.setView([lat, lon], 15);
 }
 
-
-
 /*************************************************
- * FUNZIONE OVERPASS
+ * ESECUZIONE RICERCA (OVERPASS)
  *************************************************/
-function eseguiRicerca() {
+function avviaRicerca() {
   if (!puntoRicerca) {
     document.getElementById("status").innerText =
       "⚠️ Seleziona una posizione o usa il GPS";
     return;
   }
 
-  const { lat, lon } = puntoRicerca;
-
+  // pulisce risultati precedenti
   if (layerBagni) map.removeLayer(layerBagni);
-  if (markerCentro) map.removeLayer(markerCentro);
-
-  markerCentro = L.circleMarker([lat, lon], {
-    radius: 8,
-    color: "red",
-    fillOpacity: 0.6
-  })
-    .addTo(map)
-    .bindPopup("📍 Punto di ricerca")
-    .openPopup();
-
-  map.setView([lat, lon], 15);
 
   document.getElementById("status").innerText =
-    `🔄 Ricerca in corso (${raggio / 1000} km)…`;
+    `🔄 Ricerca bagni (${raggio / 1000} km)…`;
+
+  const { lat, lon } = puntoRicerca;
 
   const query = `
 [out:json][timeout:25];
@@ -114,31 +98,31 @@ out body;
     "https://overpass-api.de/api/interpreter"
   ];
 
-  fetch(endpoints[0], {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: "data=" + encodeURIComponent(query)
-  })
+  // funzione fetch generica
+  function fetchOverpass(url) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: "data=" + encodeURIComponent(query)
+    });
+  }
+
+  fetchOverpass(endpoints[0])
     .then(r => {
       if (!r.ok) throw new Error();
       return r.json();
     })
     .then(data => mostraBagni(data))
     .catch(() => {
-      fetch(endpoints[1], {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: "data=" + encodeURIComponent(query)
-      })
+      // fallback
+      fetchOverpass(endpoints[1])
         .then(r => r.json())
         .then(data => mostraBagni(data))
         .catch(() => {
           document.getElementById("status").innerText =
-            "❌ Servizio non disponibile, riprova";
+            "❌ Servizio temporaneamente non disponibile";
         });
     });
 }
@@ -152,8 +136,16 @@ function mostraBagni(data) {
   data.elements.forEach(el => {
     if (!el.lat || !el.lon) return;
 
+    let popup = "<strong>🚻 Bagno pubblico</strong><br>";
+
+    if (el.tags) {
+      if (el.tags.wheelchair === "yes") popup += "♿ Accessibile<br>";
+      if (el.tags.fee === "yes") popup += "💰 A pagamento<br>";
+      if (el.tags.fee === "no") popup += "Gratis<br>";
+    }
+
     L.marker([el.lat, el.lon])
-      .bindPopup("🚻 Bagno pubblico")
+      .bindPopup(popup)
       .addTo(layerBagni);
   });
 
@@ -172,28 +164,37 @@ document.getElementById("btn-gps").addEventListener("click", () => {
   document.getElementById("status").innerText =
     "📍 Richiesta posizione GPS…";
 
+  if (!("geolocation" in navigator)) {
+    document.getElementById("status").innerText =
+      "❌ Geolocalizzazione non supportata";
+    return;
+  }
+
   navigator.geolocation.getCurrentPosition(
     pos => {
-    puntoRicerca = {
-  lat: pos.coords.latitude,
-  lon: pos.coords.longitude
-};
+      puntoRicerca = {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude
+      };
 
-mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
+      mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
 
-document.getElementById("status").innerText =
-  "📍 Posizione acquisita – premi Avvia ricerca";
-
+      document.getElementById("status").innerText =
+        "📍 Posizione acquisita – premi Avvia ricerca";
     },
     () => {
       document.getElementById("status").innerText =
         "❌ Posizione non concessa";
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000
     }
   );
 });
 
 /*************************************************
- * PULSANTE MAPPA
+ * PULSANTE SCELTA MAPPA
  *************************************************/
 document.getElementById("btn-map").addEventListener("click", () => {
   modalitaSceltaMappa = true;
@@ -220,11 +221,9 @@ map.on("click", e => {
     "📍 Punto selezionato – premi Avvia ricerca";
 });
 
-
-
 /*************************************************
  * PULSANTE AVVIA RICERCA
  *************************************************/
 document.getElementById("btn-search").addEventListener("click", () => {
-  eseguiRicerca();
+  avviaRicerca();
 });
