@@ -185,8 +185,10 @@
 
   <div id="controls">
     <div class="filter-section">
+      <button id="btn-load-online">📊 Carica dati online</button>
+      <span style="margin: 0 10px; color: #999;">oppure</span>
       <input type="file" id="file-input" accept=".csv" />
-      <button id="btn-load">📂 Carica CSV</button>
+      <button id="btn-load-local">📂 Carica file locale</button>
       
       <select id="filter-severity">
         <option value="all">Tutti gli incidenti</option>
@@ -199,7 +201,7 @@
       <div id="incident-count"></div>
     </div>
     
-    <div id="status">Carica il file CSV per visualizzare gli incidenti</div>
+    <div id="status">Carica i dati per visualizzare gli incidenti</div>
   </div>
 
   <div id="map"></div>
@@ -222,7 +224,38 @@
       }).addTo(map);
     }
 
-    // Carica e processa il CSV
+    // Carica CSV da URL online
+    function loadCSVFromURL(url) {
+      const status = document.getElementById('status');
+      status.textContent = 'Scaricamento dati online...';
+      status.className = '';
+      
+      fetch(url)
+        .then(response => {
+          if (!response.ok) throw new Error('File non trovato');
+          return response.text();
+        })
+        .then(csvText => {
+          Papa.parse(csvText, {
+            header: true,
+            dynamicTyping: false,
+            skipEmptyLines: true,
+            complete: function(results) {
+              processCSVData(results);
+            },
+            error: function(error) {
+              status.textContent = 'Errore nel parsing del CSV: ' + error.message;
+              status.className = 'error';
+            }
+          });
+        })
+        .catch(error => {
+          status.textContent = 'Errore nel caricamento: ' + error.message;
+          status.className = 'error';
+        });
+    }
+
+    // Carica e processa il CSV da file locale
     function loadCSV(file) {
       const status = document.getElementById('status');
       status.textContent = 'Caricamento in corso...';
@@ -233,39 +266,45 @@
         dynamicTyping: false,
         skipEmptyLines: true,
         complete: function(results) {
-          console.log('Dati grezzi:', results.data[0]); // Debug
-          
-          incidentsData = results.data.filter(row => {
-            // Converti le coordinate da stringa a numero
-            const lat = parseFloat(row.Latitudine?.toString().replace(',', '.'));
-            const lon = parseFloat(row.Longitudine?.toString().replace(',', '.'));
-            
-            // Assegna i valori convertiti
-            row.Latitudine = lat;
-            row.Longitudine = lon;
-            
-            // Verifica che siano coordinate valide per Roma
-            return !isNaN(lat) && !isNaN(lon) && 
-                   lat >= 41.7 && lat <= 42.1 && 
-                   lon >= 12.3 && lon <= 12.7;
-          });
-          
-          console.log('Incidenti filtrati:', incidentsData.length); // Debug
-          
-          if (incidentsData.length > 0) {
-            status.textContent = `Caricati ${incidentsData.length} incidenti`;
-            status.className = 'success';
-            displayIncidents(incidentsData);
-          } else {
-            status.textContent = 'Nessun incidente valido trovato nel file';
-            status.className = 'error';
-          }
+          processCSVData(results);
         },
         error: function(error) {
           status.textContent = 'Errore nel caricamento del file: ' + error.message;
           status.className = 'error';
         }
       });
+    }
+
+    // Processa i dati CSV (comune per entrambi i metodi)
+    function processCSVData(results) {
+      const status = document.getElementById('status');
+      console.log('Dati grezzi:', results.data[0]); // Debug
+      
+      incidentsData = results.data.filter(row => {
+        // Converti le coordinate da stringa a numero
+        const lat = parseFloat(row.Latitudine?.toString().replace(',', '.'));
+        const lon = parseFloat(row.Longitudine?.toString().replace(',', '.'));
+        
+        // Assegna i valori convertiti
+        row.Latitudine = lat;
+        row.Longitudine = lon;
+        
+        // Verifica che siano coordinate valide per Roma
+        return !isNaN(lat) && !isNaN(lon) && 
+               lat >= 41.7 && lat <= 42.1 && 
+               lon >= 12.3 && lon <= 12.7;
+      });
+      
+      console.log('Incidenti filtrati:', incidentsData.length); // Debug
+      
+      if (incidentsData.length > 0) {
+        status.textContent = `Caricati ${incidentsData.length} incidenti`;
+        status.className = 'success';
+        displayIncidents(incidentsData);
+      } else {
+        status.textContent = 'Nessun incidente valido trovato nel file';
+        status.className = 'error';
+      }
     }
 
     // Visualizza incidenti sulla mappa
@@ -378,7 +417,14 @@
     }
 
     // Event listeners
-    document.getElementById('btn-load').addEventListener('click', () => {
+    document.getElementById('btn-load-online').addEventListener('click', () => {
+      // URL del file CSV sul tuo server
+      // IMPORTANTE: Metti qui l'URL del tuo CSV caricato online
+      const csvURL = './incidenti_roma_2022.csv';
+      loadCSVFromURL(csvURL);
+    });
+
+    document.getElementById('btn-load-local').addEventListener('click', () => {
       const fileInput = document.getElementById('file-input');
       const file = fileInput.files[0];
       
