@@ -1,58 +1,134 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2c7be5">
-
   <meta charset="utf-8" />
-  <title>Bagni Pubblici Vicini</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<div id="controls">
-  <button id="btn-gps">📍 Usa la mia posizione</button>
-  <button id="btn-map">🗺️ Scegli sulla mappa</button>
+  <title>Le Mie App</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  <select id="radius">
-    <option value="1000">Entro 1 km</option>
-    <option value="3000" selected>Entro 3 km</option>
-    <option value="5000">Entro 5 km</option>
-  </select>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
 
-  <button id="btn-search">🔍 Avvia ricerca</button>
+    .container {
+      max-width: 600px;
+      width: 100%;
+    }
 
-  <div id="status">Scegli come cercare i bagni</div>
-</div>
+    h1 {
+      text-align: center;
+      color: white;
+      font-size: 2.5rem;
+      margin-bottom: 3rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
 
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
 
+    .app-card {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
 
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+    .app-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    }
 
-  <link rel="stylesheet" href="style.css" />
+    .app-icon {
+      font-size: 4rem;
+      margin-bottom: 15px;
+    }
+
+    .app-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .app-description {
+      font-size: 0.9rem;
+      color: #666;
+      line-height: 1.4;
+    }
+
+    .coming-soon {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .coming-soon:hover {
+      transform: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .badge {
+      display: inline-block;
+      background: #f0f0f0;
+      color: #666;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-
-  <div id="header">
-    <h1>🚻 Bagni Pubblici</h1>
+  <div class="container">
+    <h1>🏠 Le Mie App</h1>
     
+    <div class="app-grid">
+      <a href="bagni-pubblici.html" class="app-card">
+        <div class="app-icon">🚻</div>
+        <div class="app-title">Bagni Pubblici</div>
+        <div class="app-description">Trova i bagni pubblici più vicini a te</div>
+      </a>
+
+      <div class="app-card coming-soon">
+        <div class="app-icon">🍕</div>
+        <div class="app-title">Ristoranti</div>
+        <div class="app-description">Scopri i migliori ristoranti nelle vicinanze</div>
+        <div class="badge">Prossimamente</div>
+      </div>
+
+      <div class="app-card coming-soon">
+        <div class="app-icon">🏥</div>
+        <div class="app-title">Farmacie</div>
+        <div class="app-description">Trova farmacie e servizi sanitari</div>
+        <div class="badge">Prossimamente</div>
+      </div>
+
+      <div class="app-card coming-soon">
+        <div class="app-icon">⛽</div>
+        <div class="app-title">Distributori</div>
+        <div class="app-description">Trova il distributore più conveniente</div>
+        <div class="badge">Prossimamente</div>
+      </div>
+    </div>
   </div>
-
-  <div id="map"></div>
-
-  <!-- Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="map.js"></script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js");
-  });
-}
-</script>
-
-
 </body>
 </html>
