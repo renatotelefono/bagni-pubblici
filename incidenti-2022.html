@@ -230,13 +230,27 @@
       
       Papa.parse(file, {
         header: true,
-        dynamicTyping: true,
+        dynamicTyping: false,
         skipEmptyLines: true,
         complete: function(results) {
+          console.log('Dati grezzi:', results.data[0]); // Debug
+          
           incidentsData = results.data.filter(row => {
-            return row.Latitudine && row.Longitudine && 
-                   !isNaN(row.Latitudine) && !isNaN(row.Longitudine);
+            // Converti le coordinate da stringa a numero
+            const lat = parseFloat(row.Latitudine?.toString().replace(',', '.'));
+            const lon = parseFloat(row.Longitudine?.toString().replace(',', '.'));
+            
+            // Assegna i valori convertiti
+            row.Latitudine = lat;
+            row.Longitudine = lon;
+            
+            // Verifica che siano coordinate valide per Roma
+            return !isNaN(lat) && !isNaN(lon) && 
+                   lat >= 41.7 && lat <= 42.1 && 
+                   lon >= 12.3 && lon <= 12.7;
           });
+          
+          console.log('Incidenti filtrati:', incidentsData.length); // Debug
           
           if (incidentsData.length > 0) {
             status.textContent = `Caricati ${incidentsData.length} incidenti`;
@@ -263,50 +277,68 @@
       // Aggiorna contatore
       document.getElementById('incident-count').textContent = `${data.length} incidenti`;
       
+      console.log('Visualizzando', data.length, 'incidenti'); // Debug
+      console.log('Primo incidente:', data[0]); // Debug
+      
       // Aggiungi nuovi markers
-      data.forEach(incident => {
-        const icon = L.divIcon({
-          html: getIncidentIcon(incident),
-          className: 'incident-marker',
-          iconSize: [30, 30]
-        });
-        
-        const marker = L.marker([incident.Latitudine, incident.Longitudine], { icon })
+      data.forEach((incident, index) => {
+        try {
+          const lat = parseFloat(incident.Latitudine);
+          const lon = parseFloat(incident.Longitudine);
+          
+          if (isNaN(lat) || isNaN(lon)) {
+            console.warn(`Incidente ${index} ha coordinate non valide:`, lat, lon);
+            return;
+          }
+          
+          const marker = L.circleMarker([lat, lon], {
+            radius: 6,
+            fillColor: getIncidentColor(incident),
+            color: '#fff',
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          })
           .bindPopup(createPopupContent(incident))
           .addTo(map);
-        
-        markers.push(marker);
+          
+          markers.push(marker);
+        } catch (e) {
+          console.error('Errore creazione marker:', e, incident);
+        }
       });
       
+      console.log('Markers creati:', markers.length); // Debug
+      
       // Adatta la vista
-      if (data.length > 0) {
-        const bounds = L.latLngBounds(data.map(i => [i.Latitudine, i.Longitudine]));
+      if (markers.length > 0) {
+        const bounds = L.latLngBounds(data.map(i => [parseFloat(i.Latitudine), parseFloat(i.Longitudine)]));
         map.fitBounds(bounds, { padding: [50, 50] });
       }
     }
 
-    // Icona in base alla gravità
-    function getIncidentIcon(incident) {
-      const morti = incident.NUM_MORTI || 0;
-      const feriti = incident.NUM_FERITI || 0;
+    // Colore in base alla gravità
+    function getIncidentColor(incident) {
+      const morti = parseInt(incident.NUM_MORTI) || 0;
+      const feriti = parseInt(incident.NUM_FERITI) || 0;
       
       if (morti > 0) {
-        return '🔴'; // Rosso per incidenti mortali
+        return '#e74c3c'; // Rosso per incidenti mortali
       } else if (feriti > 0) {
-        return '🟠'; // Arancione per feriti
+        return '#f39c12'; // Arancione per feriti
       } else {
-        return '🟡'; // Giallo per solo illesi
+        return '#f1c40f'; // Giallo per solo illesi
       }
     }
 
     // Crea contenuto popup
     function createPopupContent(incident) {
-      const data = incident.DataOraIncidente ? new Date(incident.DataOraIncidente).toLocaleDateString('it-IT') : 'N/D';
+      const data = incident.DataOraIncidente || 'N/D';
       const strada = incident.Strada1 || 'N/D';
       const natura = incident.NaturaIncidente || 'N/D';
-      const morti = incident.NUM_MORTI || 0;
-      const feriti = incident.NUM_FERITI || 0;
-      const illesi = incident.NUM_ILLESI || 0;
+      const morti = parseInt(incident.NUM_MORTI) || 0;
+      const feriti = parseInt(incident.NUM_FERITI) || 0;
+      const illesi = parseInt(incident.NUM_ILLESI) || 0;
       
       return `
         <div class="incident-popup">
@@ -332,13 +364,13 @@
       
       switch(filterValue) {
         case 'morti':
-          filteredData = incidentsData.filter(i => (i.NUM_MORTI || 0) > 0);
+          filteredData = incidentsData.filter(i => (parseInt(i.NUM_MORTI) || 0) > 0);
           break;
         case 'feriti':
-          filteredData = incidentsData.filter(i => (i.NUM_FERITI || 0) > 0);
+          filteredData = incidentsData.filter(i => (parseInt(i.NUM_FERITI) || 0) > 0);
           break;
         case 'illesi':
-          filteredData = incidentsData.filter(i => (i.NUM_MORTI || 0) === 0 && (i.NUM_FERITI || 0) === 0);
+          filteredData = incidentsData.filter(i => (parseInt(i.NUM_MORTI) || 0) === 0 && (parseInt(i.NUM_FERITI) || 0) === 0);
           break;
       }
       
