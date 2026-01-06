@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Incidenti Roma 2022</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e74c3c">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #header {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      padding: 15px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      position: relative;
+      z-index: 1000;
+    }
+
+    #btn-home {
+      background: white;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    #btn-home:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin: 0;
+    }
+
+    #controls {
+      background: white;
+      padding: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      z-index: 999;
+    }
+
+    button, select, input[type="file"] {
+      padding: 10px 15px;
+      border: 2px solid #e74c3c;
+      background: white;
+      color: #e74c3c;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+
+    button:hover, select:hover {
+      background: #e74c3c;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #file-input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    #status {
+      flex: 1 1 100%;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      text-align: center;
+      color: #666;
+    }
+
+    #status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    #status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+    }
+
+    .incident-popup {
+      max-width: 300px;
+    }
+
+    .incident-popup h3 {
+      margin: 0 0 10px 0;
+      color: #e74c3c;
+      font-size: 1.1rem;
+    }
+
+    .incident-popup p {
+      margin: 5px 0;
+      font-size: 0.9rem;
+    }
+
+    .incident-popup strong {
+      color: #333;
+    }
+
+    .filter-section {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    #incident-count {
+      background: #e74c3c;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.2rem;
+      }
+      
+      #controls {
+        padding: 10px;
+      }
+      
+      button, select {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <a href="index.html" id="btn-home" title="Torna alla Home">🏠</a>
+    <h1>🚗 Incidenti Stradali Roma 2022</h1>
+  </div>
+
+  <div id="controls">
+    <div class="filter-section">
+      <input type="file" id="file-input" accept=".csv" />
+      <button id="btn-load">📂 Carica CSV</button>
+      
+      <select id="filter-severity">
+        <option value="all">Tutti gli incidenti</option>
+        <option value="morti">Con morti</option>
+        <option value="feriti">Con feriti</option>
+        <option value="illesi">Solo illesi</option>
+      </select>
+
+      <button id="btn-filter">🔍 Applica filtro</button>
+      <div id="incident-count"></div>
+    </div>
+    
+    <div id="status">Carica il file CSV per visualizzare gli incidenti</div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  
+  <script>
+    let map;
+    let incidentsData = [];
+    let markers = [];
+    
+    // Inizializza mappa
+    function initMap() {
+      map = L.map('map').setView([41.9028, 12.4964], 11);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+    }
+
+    // Carica e processa il CSV
+    function loadCSV(file) {
+      const status = document.getElementById('status');
+      status.textContent = 'Caricamento in corso...';
+      status.className = '';
+      
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          incidentsData = results.data.filter(row => {
+            return row.Latitudine && row.Longitudine && 
+                   !isNaN(row.Latitudine) && !isNaN(row.Longitudine);
+          });
+          
+          if (incidentsData.length > 0) {
+            status.textContent = `Caricati ${incidentsData.length} incidenti`;
+            status.className = 'success';
+            displayIncidents(incidentsData);
+          } else {
+            status.textContent = 'Nessun incidente valido trovato nel file';
+            status.className = 'error';
+          }
+        },
+        error: function(error) {
+          status.textContent = 'Errore nel caricamento del file: ' + error.message;
+          status.className = 'error';
+        }
+      });
+    }
+
+    // Visualizza incidenti sulla mappa
+    function displayIncidents(data) {
+      // Rimuovi markers esistenti
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+      
+      // Aggiorna contatore
+      document.getElementById('incident-count').textContent = `${data.length} incidenti`;
+      
+      // Aggiungi nuovi markers
+      data.forEach(incident => {
+        const icon = L.divIcon({
+          html: getIncidentIcon(incident),
+          className: 'incident-marker',
+          iconSize: [30, 30]
+        });
+        
+        const marker = L.marker([incident.Latitudine, incident.Longitudine], { icon })
+          .bindPopup(createPopupContent(incident))
+          .addTo(map);
+        
+        markers.push(marker);
+      });
+      
+      // Adatta la vista
+      if (data.length > 0) {
+        const bounds = L.latLngBounds(data.map(i => [i.Latitudine, i.Longitudine]));
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+
+    // Icona in base alla gravità
+    function getIncidentIcon(incident) {
+      const morti = incident.NUM_MORTI || 0;
+      const feriti = incident.NUM_FERITI || 0;
+      
+      if (morti > 0) {
+        return '🔴'; // Rosso per incidenti mortali
+      } else if (feriti > 0) {
+        return '🟠'; // Arancione per feriti
+      } else {
+        return '🟡'; // Giallo per solo illesi
+      }
+    }
+
+    // Crea contenuto popup
+    function createPopupContent(incident) {
+      const data = incident.DataOraIncidente ? new Date(incident.DataOraIncidente).toLocaleDateString('it-IT') : 'N/D';
+      const strada = incident.Strada1 || 'N/D';
+      const natura = incident.NaturaIncidente || 'N/D';
+      const morti = incident.NUM_MORTI || 0;
+      const feriti = incident.NUM_FERITI || 0;
+      const illesi = incident.NUM_ILLESI || 0;
+      
+      return `
+        <div class="incident-popup">
+          <h3>📍 ${strada}</h3>
+          <p><strong>Data:</strong> ${data}</p>
+          <p><strong>Natura:</strong> ${natura}</p>
+          <p><strong>Vittime:</strong></p>
+          <p style="margin-left: 15px;">
+            ${morti > 0 ? `🔴 Morti: ${morti}<br>` : ''}
+            ${feriti > 0 ? `🟠 Feriti: ${feriti}<br>` : ''}
+            🟢 Illesi: ${illesi}
+          </p>
+          ${incident.CondizioneAtmosferica ? `<p><strong>Meteo:</strong> ${incident.CondizioneAtmosferica}</p>` : ''}
+          ${incident.TipoStrada ? `<p><strong>Tipo strada:</strong> ${incident.TipoStrada}</p>` : ''}
+        </div>
+      `;
+    }
+
+    // Filtra incidenti
+    function filterIncidents() {
+      const filterValue = document.getElementById('filter-severity').value;
+      let filteredData = incidentsData;
+      
+      switch(filterValue) {
+        case 'morti':
+          filteredData = incidentsData.filter(i => (i.NUM_MORTI || 0) > 0);
+          break;
+        case 'feriti':
+          filteredData = incidentsData.filter(i => (i.NUM_FERITI || 0) > 0);
+          break;
+        case 'illesi':
+          filteredData = incidentsData.filter(i => (i.NUM_MORTI || 0) === 0 && (i.NUM_FERITI || 0) === 0);
+          break;
+      }
+      
+      displayIncidents(filteredData);
+    }
+
+    // Event listeners
+    document.getElementById('btn-load').addEventListener('click', () => {
+      const fileInput = document.getElementById('file-input');
+      const file = fileInput.files[0];
+      
+      if (file) {
+        loadCSV(file);
+      } else {
+        const status = document.getElementById('status');
+        status.textContent = 'Seleziona prima un file CSV';
+        status.className = 'error';
+      }
+    });
+
+    document.getElementById('btn-filter').addEventListener('click', filterIncidents);
+
+    // Inizializza la mappa
+    initMap();
+  </script>
+
+</body>
+</html>
