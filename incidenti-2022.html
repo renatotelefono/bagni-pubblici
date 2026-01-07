@@ -218,10 +218,24 @@
     // CONFIGURAZIONE SUPABASE
     // ============================================
     
+    console.log('🔧 Step 1: Inizializzazione...');
+    
     const SUPABASE_URL = 'https://hkvhsjfyquoqmdeodkfl.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdmhzamZ5cXVvcW1kZW9ka2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjU3MjAsImV4cCI6MjA4MzMwMTcyMH0.iXn3LLiTOWShDsfftKd8WkEe35xOhCFyuCSnOWgLmgg';
     
+    console.log('🔧 Step 2: Credenziali impostate');
+    console.log('   URL:', SUPABASE_URL);
+    console.log('   Key:', SUPABASE_ANON_KEY.substring(0, 30) + '...');
+    
+    if (typeof window.supabase === 'undefined') {
+      console.error('❌ ERRORE: Libreria Supabase non caricata!');
+      alert('Errore: Libreria Supabase non disponibile. Controlla la connessione internet.');
+    } else {
+      console.log('✅ Step 3: Libreria Supabase disponibile');
+    }
+    
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('✅ Step 4: Client Supabase creato');
     
     // ============================================
     // VARIABILI GLOBALI
@@ -259,11 +273,15 @@
     async function loadIncidentsFromSupabase() {
       if (isLoading) return;
       
+      console.log('🔍 Step A: Inizio caricamento...');
+      
       const status = document.getElementById('status');
       isLoading = true;
       
       status.textContent = '⏳ Caricamento dati da Supabase...';
       status.className = 'loading';
+      
+      console.log('🔍 Step B: Status aggiornato');
       
       try {
         // Ottieni i bounds della mappa visibile
@@ -272,6 +290,8 @@
         const south = bounds.getSouth();
         const east = bounds.getEast();
         const west = bounds.getWest();
+        
+        console.log('🔍 Step C: Bounds calcolati:', { north, south, east, west });
         
         // Query Supabase con filtro geografico
         let query = supabase
@@ -282,8 +302,12 @@
           .gte('longitude', west)
           .lte('longitude', east);
         
+        console.log('🔍 Step D: Query preparata');
+        
         // Applica filtro severità se selezionato
         const severity = document.getElementById('filter-severity').value;
+        console.log('🔍 Step E: Filtro severità:', severity);
+        
         if (severity === 'morti') {
           query = query.gt('deaths', 0);
         } else if (severity === 'feriti') {
@@ -295,7 +319,13 @@
         // Limita a 1000 record (per performance)
         query = query.limit(1000);
         
+        console.log('🔍 Step F: Esecuzione query...');
+        
         const { data, error } = await query;
+        
+        console.log('🔍 Step G: Query completata');
+        console.log('   Data:', data ? data.length + ' records' : 'null');
+        console.log('   Error:', error);
         
         if (error) throw error;
         
@@ -304,14 +334,19 @@
         status.textContent = `✅ Caricati ${data.length} incidenti`;
         status.className = 'success';
         
+        console.log('✅ Step H: Dati ricevuti, visualizzazione...');
+        
         displayIncidents(data);
         
       } catch (error) {
-        console.error('Errore caricamento:', error);
+        console.error('❌ ERRORE Step X:', error);
+        console.error('   Message:', error.message);
+        console.error('   Stack:', error.stack);
         status.textContent = '❌ Errore: ' + error.message;
         status.className = 'error';
       } finally {
         isLoading = false;
+        console.log('🔍 Step Z: Caricamento completato');
       }
     }
 
