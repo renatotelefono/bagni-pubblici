@@ -9,11 +9,8 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <!-- Leaflet -->
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
-  <!-- Supabase Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <style>
     * {
@@ -37,7 +34,6 @@
       display: flex;
       align-items: center;
       gap: 15px;
-      position: relative;
       z-index: 1000;
     }
 
@@ -55,17 +51,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
     }
 
     #btn-home:hover {
       transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
 
     h1 {
       font-size: 1.5rem;
-      margin: 0;
     }
 
     #controls {
@@ -96,11 +89,6 @@
       color: white;
     }
 
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
     #status {
       flex: 1 1 100%;
       padding: 10px;
@@ -126,13 +114,17 @@
       color: #856404;
     }
 
+    #incident-count {
+      background: #e74c3c;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
     #map {
       flex: 1;
       width: 100%;
-    }
-
-    .incident-popup {
-      max-width: 300px;
     }
 
     .incident-popup h3 {
@@ -145,41 +137,6 @@
       margin: 5px 0;
       font-size: 0.9rem;
     }
-
-    .incident-popup strong {
-      color: #333;
-    }
-
-    .filter-section {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    #incident-count {
-      background: #e74c3c;
-      color: white;
-      padding: 8px 15px;
-      border-radius: 20px;
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-
-    @media (max-width: 768px) {
-      h1 {
-        font-size: 1.2rem;
-      }
-      
-      #controls {
-        padding: 10px;
-      }
-      
-      button, select {
-        font-size: 0.85rem;
-        padding: 8px 12px;
-      }
-    }
   </style>
 </head>
 <body>
@@ -190,67 +147,72 @@
   </div>
 
   <div id="controls">
-    <div class="filter-section">
-      <button id="btn-load">📊 Carica Incidenti</button>
-      
-      <select id="filter-severity">
-        <option value="all">Tutti gli incidenti</option>
-        <option value="morti">Con morti</option>
-        <option value="feriti">Con feriti</option>
-        <option value="illesi">Solo illesi</option>
-      </select>
+    <button id="btn-load">📊 Carica Incidenti</button>
+    
+    <select id="filter-severity">
+      <option value="all">Tutti gli incidenti</option>
+      <option value="morti">Con morti</option>
+      <option value="feriti">Con feriti</option>
+      <option value="illesi">Solo illesi</option>
+    </select>
 
-      <button id="btn-filter">🔍 Applica filtro</button>
-      <button id="btn-refresh">🔄 Ricarica area</button>
-      <div id="incident-count"></div>
-    </div>
+    <button id="btn-filter">🔍 Applica filtro</button>
+    <div id="incident-count"></div>
     
     <div id="status">Clicca "Carica Incidenti" per visualizzare i dati</div>
   </div>
 
   <div id="map"></div>
 
-  <!-- Leaflet -->
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script>
-    // ============================================
-    // CONFIGURAZIONE SUPABASE
-    // ============================================
+    console.log('🚀 Script avviato');
     
-    console.log('🔧 Step 1: Inizializzazione...');
+    // ============================================
+    // CONFIGURAZIONE
+    // ============================================
     
     const SUPABASE_URL = 'https://hkvhsjfyquoqmdeodkfl.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdmhzamZ5cXVvcW1kZW9ka2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjU3MjAsImV4cCI6MjA4MzMwMTcyMH0.iXn3LLiTOWShDsfftKd8WkEe35xOhCFyuCSnOWgLmgg';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdmhzamZ5cXVvcW1kZW9ka2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjU3MjAsImV4cCI6MjA4MzMwMTcyMH0.iXn3LLiTOWShDsfftKd8WkEe35xOhCFyuCSnOWgLmgg';
     
-    console.log('🔧 Step 2: Credenziali impostate');
-    console.log('   URL:', SUPABASE_URL);
-    console.log('   Key:', SUPABASE_ANON_KEY.substring(0, 30) + '...');
-    
-    if (typeof window.supabase === 'undefined') {
-      console.error('❌ ERRORE: Libreria Supabase non caricata!');
-      alert('Errore: Libreria Supabase non disponibile. Controlla la connessione internet.');
-    } else {
-      console.log('✅ Step 3: Libreria Supabase disponibile');
-    }
-    
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('✅ Step 4: Client Supabase creato');
-    
-    // ============================================
-    // VARIABILI GLOBALI
-    // ============================================
+    console.log('✅ Configurazione caricata');
     
     let map;
-    let incidentsData = [];
     let markers = [];
-    let isLoading = false;
+    let supabaseClient;
     
     // ============================================
-    // INIZIALIZZAZIONE MAPPA
+    // INIZIALIZZAZIONE
     // ============================================
+    
+    function initSupabase() {
+      console.log('🔌 Inizializzazione Supabase...');
+      
+      if (typeof window.supabase === 'undefined') {
+        console.error('❌ Libreria Supabase non caricata!');
+        showStatus('Errore: Libreria Supabase non disponibile', 'error');
+        return false;
+      }
+      
+      try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('✅ Client Supabase creato');
+        return true;
+      } catch (error) {
+        console.error('❌ Errore creazione client:', error);
+        showStatus('Errore nella connessione a Supabase', 'error');
+        return false;
+      }
+    }
     
     function initMap() {
+      console.log('🗺️ Inizializzazione mappa...');
+      
       map = L.map('map').setView([41.9028, 12.4964], 11);
       
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -258,43 +220,27 @@
         maxZoom: 19
       }).addTo(map);
       
-      // Carica automaticamente quando la mappa si muove
-      map.on('moveend', () => {
-        if (incidentsData.length > 0) {
-          loadIncidentsFromSupabase();
-        }
-      });
+      console.log('✅ Mappa inizializzata');
     }
-
+    
     // ============================================
-    // CARICAMENTO DATI DA SUPABASE
+    // CARICAMENTO DATI
     // ============================================
     
-    async function loadIncidentsFromSupabase() {
-      if (isLoading) return;
-      
-      console.log('🔍 Step A: Inizio caricamento...');
-      
-      const status = document.getElementById('status');
-      isLoading = true;
-      
-      status.textContent = '⏳ Caricamento dati da Supabase...';
-      status.className = 'loading';
-      
-      console.log('🔍 Step B: Status aggiornato');
+    async function loadIncidents() {
+      console.log('📊 Caricamento incidenti...');
+      showStatus('Caricamento dati da Supabase...', 'loading');
       
       try {
-        // Ottieni i bounds della mappa visibile
         const bounds = map.getBounds();
         const north = bounds.getNorth();
         const south = bounds.getSouth();
         const east = bounds.getEast();
         const west = bounds.getWest();
         
-        console.log('🔍 Step C: Bounds calcolati:', { north, south, east, west });
+        console.log('📍 Bounds:', { north, south, east, west });
         
-        // Query Supabase con filtro geografico
-        let query = supabase
+        let query = supabaseClient
           .from('incidents_italy')
           .select('*')
           .gte('latitude', south)
@@ -302,12 +248,8 @@
           .gte('longitude', west)
           .lte('longitude', east);
         
-        console.log('🔍 Step D: Query preparata');
-        
-        // Applica filtro severità se selezionato
+        // Applica filtro
         const severity = document.getElementById('filter-severity').value;
-        console.log('🔍 Step E: Filtro severità:', severity);
-        
         if (severity === 'morti') {
           query = query.gt('deaths', 0);
         } else if (severity === 'feriti') {
@@ -316,157 +258,141 @@
           query = query.eq('deaths', 0).eq('total_injuries', 0);
         }
         
-        // Limita a 1000 record (per performance)
         query = query.limit(1000);
         
-        console.log('🔍 Step F: Esecuzione query...');
-        
+        console.log('🔍 Esecuzione query...');
         const { data, error } = await query;
         
-        console.log('🔍 Step G: Query completata');
-        console.log('   Data:', data ? data.length + ' records' : 'null');
-        console.log('   Error:', error);
+        if (error) {
+          console.error('❌ Errore database:', error);
+          showStatus('Errore: ' + error.message, 'error');
+          return;
+        }
         
-        if (error) throw error;
-        
-        incidentsData = data;
-        
-        status.textContent = `✅ Caricati ${data.length} incidenti`;
-        status.className = 'success';
-        
-        console.log('✅ Step H: Dati ricevuti, visualizzazione...');
+        console.log('✅ Ricevuti', data.length, 'incidenti');
+        showStatus(`Caricati ${data.length} incidenti`, 'success');
         
         displayIncidents(data);
         
       } catch (error) {
-        console.error('❌ ERRORE Step X:', error);
-        console.error('   Message:', error.message);
-        console.error('   Stack:', error.stack);
-        status.textContent = '❌ Errore: ' + error.message;
-        status.className = 'error';
-      } finally {
-        isLoading = false;
-        console.log('🔍 Step Z: Caricamento completato');
+        console.error('❌ Errore:', error);
+        showStatus('Errore: ' + error.message, 'error');
       }
     }
-
+    
     // ============================================
-    // VISUALIZZAZIONE MARKER SULLA MAPPA
+    // VISUALIZZAZIONE
     // ============================================
     
     function displayIncidents(data) {
+      console.log('🎨 Visualizzazione', data.length, 'marker...');
+      
       // Rimuovi marker esistenti
-      markers.forEach(marker => map.removeLayer(marker));
+      markers.forEach(m => map.removeLayer(m));
       markers = [];
       
       // Aggiorna contatore
       document.getElementById('incident-count').textContent = `${data.length} incidenti`;
       
       if (data.length === 0) {
-        const status = document.getElementById('status');
-        status.textContent = 'Nessun incidente trovato in questa area';
-        status.className = '';
+        showStatus('Nessun incidente in questa area');
         return;
       }
       
-      // Aggiungi nuovi marker
-      data.forEach((incident) => {
-        try {
-          const lat = parseFloat(incident.latitude);
-          const lon = parseFloat(incident.longitude);
-          
-          if (isNaN(lat) || isNaN(lon)) return;
-          
-          const marker = L.circleMarker([lat, lon], {
-            radius: 6,
-            fillColor: getIncidentColor(incident),
-            color: '#fff',
-            weight: 1,
-            opacity: 1,
-            fillOpacity: 0.8
-          })
-          .bindPopup(createPopupContent(incident))
-          .addTo(map);
-          
-          markers.push(marker);
-        } catch (e) {
-          console.error('Errore creazione marker:', e);
-        }
+      // Aggiungi marker
+      data.forEach(incident => {
+        const lat = parseFloat(incident.latitude);
+        const lon = parseFloat(incident.longitude);
+        
+        if (isNaN(lat) || isNaN(lon)) return;
+        
+        const color = getColor(incident);
+        
+        const marker = L.circleMarker([lat, lon], {
+          radius: 6,
+          fillColor: color,
+          color: '#fff',
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        })
+        .bindPopup(createPopup(incident))
+        .addTo(map);
+        
+        markers.push(marker);
       });
+      
+      console.log('✅ Visualizzati', markers.length, 'marker');
     }
-
-    // ============================================
-    // COLORE MARKER IN BASE ALLA GRAVITÀ
-    // ============================================
     
-    function getIncidentColor(incident) {
+    function getColor(incident) {
       const deaths = parseInt(incident.deaths) || 0;
       const injuries = parseInt(incident.total_injuries) || 0;
       
-      if (deaths > 0) {
-        return '#e74c3c'; // Rosso per morti
-      } else if (injuries > 0) {
-        return '#f39c12'; // Arancione per feriti
-      } else {
-        return '#f1c40f'; // Giallo per illesi
-      }
+      if (deaths > 0) return '#e74c3c';
+      if (injuries > 0) return '#f39c12';
+      return '#f1c40f';
     }
-
-    // ============================================
-    // CONTENUTO POPUP
-    // ============================================
     
-    function createPopupContent(incident) {
-      const data = incident.incident_date || 'N/D';
-      const strada = incident.road_name || 'N/D';
-      const natura = incident.incident_nature || 'N/D';
-      const deaths = parseInt(incident.deaths) || 0;
-      const injuries = parseInt(incident.total_injuries) || 0;
-      const unharmed = parseInt(incident.unharmed) || 0;
+    function createPopup(incident) {
+      const road = incident.road_name || 'N/D';
+      const date = incident.incident_date || 'N/D';
+      const nature = incident.incident_nature || 'N/D';
+      const deaths = incident.deaths || 0;
+      const injuries = incident.total_injuries || 0;
+      const unharmed = incident.unharmed || 0;
       
       return `
         <div class="incident-popup">
-          <h3>📍 ${strada}</h3>
-          <p><strong>Data:</strong> ${data}</p>
-          <p><strong>Natura:</strong> ${natura}</p>
+          <h3>📍 ${road}</h3>
+          <p><strong>Data:</strong> ${date}</p>
+          <p><strong>Natura:</strong> ${nature}</p>
           <p><strong>Vittime:</strong></p>
           <p style="margin-left: 15px;">
             ${deaths > 0 ? `🔴 Morti: ${deaths}<br>` : ''}
             ${injuries > 0 ? `🟠 Feriti: ${injuries}<br>` : ''}
             🟢 Illesi: ${unharmed}
           </p>
-          ${incident.weather_condition ? `<p><strong>Meteo:</strong> ${incident.weather_condition}</p>` : ''}
-          ${incident.road_type ? `<p><strong>Tipo strada:</strong> ${incident.road_type}</p>` : ''}
         </div>
       `;
     }
-
+    
+    function showStatus(message, type = '') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = type;
+    }
+    
     // ============================================
     // EVENT LISTENERS
     // ============================================
     
     document.getElementById('btn-load').addEventListener('click', () => {
-      loadIncidentsFromSupabase();
+      console.log('👆 Click su Carica Incidenti');
+      loadIncidents();
     });
-
+    
     document.getElementById('btn-filter').addEventListener('click', () => {
-      if (incidentsData.length > 0) {
-        loadIncidentsFromSupabase();
-      }
+      console.log('👆 Click su Applica Filtro');
+      loadIncidents();
     });
-
-    document.getElementById('btn-refresh').addEventListener('click', () => {
-      loadIncidentsFromSupabase();
-    });
-
+    
     // ============================================
-    // INIZIALIZZAZIONE
+    // AVVIO
     // ============================================
     
     window.addEventListener('load', () => {
+      console.log('🚀 Pagina caricata');
+      
+      if (!initSupabase()) {
+        console.error('❌ Inizializzazione Supabase fallita');
+        return;
+      }
+      
       initMap();
-      console.log('✅ Mappa inizializzata');
-      console.log('📡 Connesso a Supabase:', SUPABASE_URL);
+      
+      console.log('✅ Tutto pronto!');
+      console.log('👉 Clicca "Carica Incidenti" per iniziare');
     });
   </script>
 
