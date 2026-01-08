@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Mappa Pericolosità Italia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e74c3c">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f5f5f5;
+    }
+
+    #header {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      padding: 15px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    #header h1 {
+      font-size: 1.5rem;
+      margin-bottom: 5px;
+    }
+
+    #header p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    #controls {
+      background: white;
+      padding: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      z-index: 999;
+    }
+
+    select, button {
+      padding: 10px 15px;
+      border: 2px solid #e74c3c;
+      background: white;
+      color: #e74c3c;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+
+    select:hover, button:hover {
+      background: #e74c3c;
+      color: white;
+    }
+
+    #status {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: #f8f9fa;
+      color: #666;
+    }
+
+    #status.loading {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    #status.success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+      position: relative;
+    }
+
+    .info-legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      max-width: 200px;
+    }
+
+    .info-legend h3 {
+      margin: 0 0 10px 0;
+      font-size: 0.95rem;
+      color: #333;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+      font-size: 0.85rem;
+    }
+
+    .legend-color {
+      width: 30px;
+      height: 20px;
+      margin-right: 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+
+    .leaflet-popup-content {
+      min-width: 280px;
+    }
+
+    .popup-header {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+      padding: 12px;
+      margin: -10px -10px 12px -10px;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .popup-header h3 {
+      margin: 0 0 3px 0;
+      font-size: 1.2rem;
+    }
+
+    .popup-header small {
+      opacity: 0.9;
+      font-size: 0.85rem;
+    }
+
+    .popup-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .stat-box {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .risk-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin: 10px 0;
+    }
+
+    .risk-basso { background: #d4edda; color: #155724; }
+    .risk-medio { background: #fff3cd; color: #856404; }
+    .risk-alto { background: #f8d7da; color: #721c24; }
+    .risk-molto_alto { background: #721c24; color: white; }
+
+    .top-crimes {
+      margin-top: 15px;
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+    }
+
+    .top-crimes h4 {
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .crime-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.8rem;
+    }
+
+    .crime-item:last-child {
+      border-bottom: none;
+    }
+
+    .crime-name {
+      flex: 1;
+      padding-right: 10px;
+      color: #555;
+    }
+
+    .crime-count {
+      font-weight: bold;
+      color: #e74c3c;
+    }
+
+    .info-text {
+      margin: 10px 0;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .info-text strong {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h1>🗺️ Mappa Pericolosità Italia</h1>
+    <p>Indice di criminalità per provincia - Dati 2020</p>
+  </div>
+
+  <div id="controls">
+    <button id="btn-load">📊 Carica Dati</button>
+    
+    <select id="filter-risk">
+      <option value="all">Tutte le province</option>
+      <option value="basso">Rischio Basso</option>
+      <option value="medio">Rischio Medio</option>
+      <option value="alto">Rischio Alto</option>
+      <option value="molto_alto">Rischio Molto Alto</option>
+    </select>
+
+    <button id="btn-filter">🔍 Filtra</button>
+    
+    <div id="status">Clicca "Carica Dati" per visualizzare la mappa</div>
+  </div>
+
+  <div id="map">
+    <div class="info-legend">
+      <h3>📊 Legenda</h3>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #27ae60;"></div>
+        <span>Basso (0-20)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f1c40f;"></div>
+        <span>Medio (20-40)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #e67e22;"></div>
+        <span>Alto (40-70)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #c0392b;"></div>
+        <span>Molto Alto (70+)</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    const SUPABASE_URL = 'https://hkvhsjfyquoqmdeodkfl.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdmhzamZ5cXVvcW1kZW9ka2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjU3MjAsImV4cCI6MjA4MzMwMTcyMH0.iXn3LLiTOWShDsfftKd8WkEe35xOhCFyuCSnOWgLmgg';
+    
+    let map;
+    let markers = [];
+    let supabaseClient;
+    let provinceData = [];
+
+    function showStatus(message, type = '') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = type;
+    }
+
+    function initSupabase() {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log('✅ Supabase inizializzato');
+    }
+
+    function initMap() {
+      map = L.map('map').setView([42.5, 12.5], 6);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 13,
+        minZoom: 5
+      }).addTo(map);
+      
+      console.log('✅ Mappa inizializzata');
+    }
+
+    async function loadProvinceData() {
+      console.log('📊 Caricamento dati...');
+      showStatus('Caricamento dati da Supabase...', 'loading');
+      
+      try {
+        const { data, error } = await supabaseClient
+          .from('province_danger_index')
+          .select('*')
+          .eq('anno', 2020);
+        
+        if (error) throw error;
+        
+        provinceData = data;
+        console.log(`✅ Caricati dati per ${data.length} province`);
+        showStatus(`✅ Caricati ${data.length} province`, 'success');
+        
+        displayProvinces(provinceData);
+        
+      } catch (error) {
+        console.error('❌ Errore:', error);
+        showStatus('❌ Errore nel caricamento dei dati', 'error');
+      }
+    }
+
+    function displayProvinces(data) {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      
+      data.forEach(provincia => {
+        const color = getColorByIndex(provincia.indice_pericolosita);
+        const radius = Math.max(10, Math.min(25, provincia.indice_pericolosita / 4));
+        
+        const marker = L.circleMarker([provincia.latitude, provincia.longitude], {
+          radius: radius,
+          fillColor: color,
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.7
+        })
+        .bindPopup(createProvincePopup(provincia))
+        .addTo(map);
+        
+        markers.push(marker);
+      });
+      
+      console.log(`✅ Visualizzati ${markers.length} marker`);
+    }
+
+    function getColorByIndex(indice) {
+      if (indice < 20) return '#27ae60';
+      if (indice < 40) return '#f1c40f';
+      if (indice < 70) return '#e67e22';
+      return '#c0392b';
+    }
+
+    function createProvincePopup(provincia) {
+      const riskClass = `risk-${provincia.categoria_rischio}`;
+      const riskLabel = provincia.categoria_rischio.replace('_', ' ').toUpperCase();
+      
+      let topCrimes = '';
+      if (provincia.dettaglio_reati && provincia.dettaglio_reati.length > 0) {
+        topCrimes = '<div class="top-crimes"><h4>🔝 Principali Reati:</h4>';
+        provincia.dettaglio_reati.slice(0, 5).forEach(reato => {
+          const nomeReato = reato.reato.replace(/^\d+\.\d+\s+/, '');
+          const shortName = nomeReato.length > 35 ? nomeReato.substring(0, 35) + '...' : nomeReato;
+          topCrimes += `
+            <div class="crime-item">
+              <span class="crime-name">${shortName}</span>
+              <span class="crime-count">${reato.totale_delitti.toLocaleString()}</span>
+            </div>
+          `;
+        });
+        topCrimes += '</div>';
+      }
+      
+      return `
+        <div>
+          <div class="popup-header">
+            <h3>${provincia.provincia}</h3>
+            <small>${provincia.regione}</small>
+          </div>
+          
+          <div class="risk-badge ${riskClass}">
+            ${riskLabel}
+          </div>
+          
+          <div class="popup-stats">
+            <div class="stat-box">
+              <div class="stat-value">${provincia.indice_pericolosita}</div>
+              <div class="stat-label">Indice</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">${provincia.delitti_per_100k.toFixed(1)}</div>
+              <div class="stat-label">Reati/100k ab</div>
+            </div>
+          </div>
+          
+          <div class="info-text">
+            <strong>Popolazione:</strong> ${provincia.popolazione.toLocaleString()}<br>
+            <strong>Totale delitti:</strong> ${provincia.totale_delitti.toLocaleString()}
+          </div>
+          
+          ${topCrimes}
+        </div>
+      `;
+    }
+
+    function filterByRisk() {
+      const selected = document.getElementById('filter-risk').value;
+      
+      if (selected === 'all') {
+        displayProvinces(provinceData);
+        showStatus(`✅ Visualizzate tutte le ${provinceData.length} province`, 'success');
+      } else {
+        const filtered = provinceData.filter(p => p.categoria_rischio === selected);
+        displayProvinces(filtered);
+        showStatus(`✅ Filtrate ${filtered.length} province con rischio ${selected}`, 'success');
+      }
+    }
+
+    document.getElementById('btn-load').addEventListener('click', loadProvinceData);
+    document.getElementById('btn-filter').addEventListener('click', filterByRisk);
+
+    window.addEventListener('load', () => {
+      initSupabase();
+      initMap();
+      console.log('✅ App pronta! Clicca "Carica Dati"');
+    });
+  </script>
+
+</body>
+</html>
