@@ -13,17 +13,170 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let raggio = 3000;                // metri
 let puntoRicerca = null;          // { lat, lon }
 let modalitaSceltaMappa = false;
+let categoriaSelezionata = "toilets";
 
 let markerPreview = null;         // punto selezionato
 let circlePreview = null;         // cerchio raggio
-let layerBagni = null;            // marker bagni
+let layerRisultati = null;        // marker risultati
 
+/*************************************************
+ * CONFIGURAZIONE CATEGORIE
+ *************************************************/
+const categorie = {
+  toilets: {
+    nome: "Bagni pubblici",
+    emoji: "🚻",
+    tag: 'amenity="toilets"',
+    popup: (tags) => {
+      let info = "<strong>🚻 Bagno pubblico</strong><br>";
+      if (tags.name) info += `${tags.name}<br>`;
+      if (tags.wheelchair === "yes") info += "♿ Accessibile<br>";
+      if (tags.fee === "yes") info += "💰 A pagamento<br>";
+      if (tags.fee === "no") info += "✅ Gratis<br>";
+      return info;
+    }
+  },
+  cinema: {
+    nome: "Cinema",
+    emoji: "🎬",
+    tag: 'amenity="cinema"',
+    popup: (tags) => {
+      let info = `<strong>🎬 ${tags.name || 'Cinema'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      if (tags.website) info += `🌐 <a href="${tags.website}" target="_blank">Sito web</a><br>`;
+      return info;
+    }
+  },
+  restaurant: {
+    nome: "Ristoranti",
+    emoji: "🍽️",
+    tag: 'amenity="restaurant"',
+    popup: (tags) => {
+      let info = `<strong>🍽️ ${tags.name || 'Ristorante'}</strong><br>`;
+      if (tags.cuisine) info += `🍴 Cucina: ${tags.cuisine}<br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      if (tags.website) info += `🌐 <a href="${tags.website}" target="_blank">Sito web</a><br>`;
+      return info;
+    }
+  },
+  pharmacy: {
+    nome: "Farmacie",
+    emoji: "💊",
+    tag: 'amenity="pharmacy"',
+    popup: (tags) => {
+      let info = `<strong>💊 ${tags.name || 'Farmacia'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.opening_hours) info += `🕐 ${tags.opening_hours}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      return info;
+    }
+  },
+  hospital: {
+    nome: "Ospedali",
+    emoji: "🏥",
+    tag: 'amenity="hospital"',
+    popup: (tags) => {
+      let info = `<strong>🏥 ${tags.name || 'Ospedale'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      if (tags.emergency === "yes") info += `🚨 Pronto soccorso<br>`;
+      return info;
+    }
+  },
+  fuel: {
+    nome: "Distributori",
+    emoji: "⛽",
+    tag: 'amenity="fuel"',
+    popup: (tags) => {
+      let info = `<strong>⛽ ${tags.name || tags.brand || 'Distributore'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.opening_hours) info += `🕐 ${tags.opening_hours}<br>`;
+      return info;
+    }
+  },
+  atm: {
+    nome: "Bancomat",
+    emoji: "🏧",
+    tag: 'amenity="atm"',
+    popup: (tags) => {
+      let info = "<strong>🏧 Bancomat</strong><br>";
+      if (tags.operator) info += `🏦 ${tags.operator}<br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      return info;
+    }
+  },
+  parking: {
+    nome: "Parcheggi",
+    emoji: "🅿️",
+    tag: 'amenity="parking"',
+    popup: (tags) => {
+      let info = `<strong>🅿️ ${tags.name || 'Parcheggio'}</strong><br>`;
+      if (tags.fee === "yes") info += "💰 A pagamento<br>";
+      if (tags.fee === "no") info += "✅ Gratis<br>";
+      if (tags.capacity) info += `📊 Posti: ${tags.capacity}<br>`;
+      return info;
+    }
+  },
+  cafe: {
+    nome: "Bar/Caffè",
+    emoji: "☕",
+    tag: 'amenity="cafe"',
+    popup: (tags) => {
+      let info = `<strong>☕ ${tags.name || 'Bar'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      if (tags.outdoor_seating === "yes") info += `🪑 Posti esterni<br>`;
+      return info;
+    }
+  },
+  supermarket: {
+    nome: "Supermercati",
+    emoji: "🛒",
+    tag: 'shop="supermarket"',
+    popup: (tags) => {
+      let info = `<strong>🛒 ${tags.name || 'Supermercato'}</strong><br>`;
+      if (tags["addr:street"]) info += `📍 ${tags["addr:street"]}<br>`;
+      if (tags.opening_hours) info += `🕐 ${tags.opening_hours}<br>`;
+      if (tags.phone) info += `📞 ${tags.phone}<br>`;
+      return info;
+    }
+  }
+};
+
+/*************************************************
+ * FUNZIONI CURSORE
+ *************************************************/
 function abilitaCursoreSelezione() {
   map.getContainer().classList.add("map-select-mode");
 }
 
 function disabilitaCursoreSelezione() {
   map.getContainer().classList.remove("map-select-mode");
+}
+
+/*************************************************
+ * GESTIONE CATEGORIA
+ *************************************************/
+const categorySelect = document.getElementById("category");
+if (categorySelect) {
+  categoriaSelezionata = categorySelect.value;
+
+  categorySelect.addEventListener("change", e => {
+    categoriaSelezionata = e.target.value;
+    
+    const cat = categorie[categoriaSelezionata];
+    
+    // Aggiorna titolo pagina
+    const pageTitle = document.getElementById("page-title");
+    if (pageTitle) {
+      pageTitle.textContent = `${cat.emoji} ${cat.nome}`;
+    }
+    
+    document.getElementById("status").innerText =
+      `Categoria: ${cat.nome} — seleziona posizione e avvia ricerca`;
+  });
 }
 
 /*************************************************
@@ -41,7 +194,7 @@ if (radiusSelect) {
     }
 
     document.getElementById("status").innerText =
-      `Raggio impostato a ${raggio / 1000} km – premi Avvia ricerca`;
+      `Raggio impostato a ${raggio / 1000} km — premi Avvia ricerca`;
   });
 }
 
@@ -86,17 +239,20 @@ function avviaRicerca() {
   }
 
   // pulisce risultati precedenti
-  if (layerBagni) map.removeLayer(layerBagni);
+  if (layerRisultati) map.removeLayer(layerRisultati);
+
+  const cat = categorie[categoriaSelezionata];
 
   document.getElementById("status").innerText =
-    `🔄 Ricerca bagni (${raggio / 1000} km)…`;
+    `🔄 Ricerca ${cat.nome} (${raggio / 1000} km)…`;
 
   const { lat, lon } = puntoRicerca;
 
   const query = `
 [out:json][timeout:25];
 (
-  node["amenity"="toilets"](around:${raggio},${lat},${lon});
+  node[${cat.tag}](around:${raggio},${lat},${lon});
+  way[${cat.tag}](around:${raggio},${lat},${lon});
 );
 out body;
 `;
@@ -122,12 +278,12 @@ out body;
       if (!r.ok) throw new Error();
       return r.json();
     })
-    .then(data => mostraBagni(data))
+    .then(data => mostraRisultati(data))
     .catch(() => {
       // fallback
       fetchOverpass(endpoints[1])
         .then(r => r.json())
-        .then(data => mostraBagni(data))
+        .then(data => mostraRisultati(data))
         .catch(() => {
           document.getElementById("status").innerText =
             "❌ Servizio temporaneamente non disponibile";
@@ -136,31 +292,33 @@ out body;
 }
 
 /*************************************************
- * MOSTRA BAGNI
+ * MOSTRA RISULTATI
  *************************************************/
-function mostraBagni(data) {
-  layerBagni = L.layerGroup();
+function mostraRisultati(data) {
+  layerRisultati = L.layerGroup();
+  
+  const cat = categorie[categoriaSelezionata];
 
   data.elements.forEach(el => {
     if (!el.lat || !el.lon) return;
 
-    let popup = "<strong>🚻 Bagno pubblico</strong><br>";
+    const popup = cat.popup(el.tags || {});
 
-    if (el.tags) {
-      if (el.tags.wheelchair === "yes") popup += "♿ Accessibile<br>";
-      if (el.tags.fee === "yes") popup += "💰 A pagamento<br>";
-      if (el.tags.fee === "no") popup += "Gratis<br>";
-    }
+    const icon = L.divIcon({
+      html: cat.emoji,
+      className: 'custom-icon',
+      iconSize: [30, 30]
+    });
 
-    L.marker([el.lat, el.lon])
+    L.marker([el.lat, el.lon], { icon })
       .bindPopup(popup)
-      .addTo(layerBagni);
+      .addTo(layerRisultati);
   });
 
-  layerBagni.addTo(map);
+  layerRisultati.addTo(map);
 
   document.getElementById("status").innerText =
-    `🚻 Bagni trovati: ${data.elements.length}`;
+    `${cat.emoji} ${cat.nome} trovati: ${data.elements.length}`;
 }
 
 /*************************************************
@@ -170,7 +328,7 @@ document.getElementById("btn-gps").addEventListener("click", () => {
   modalitaSceltaMappa = false;
 
   document.getElementById("status").innerText =
-    "📍 Richiesta posizione GPS…";
+    "📡 Richiesta posizione GPS…";
 
   if (!("geolocation" in navigator)) {
     document.getElementById("status").innerText =
@@ -188,7 +346,7 @@ document.getElementById("btn-gps").addEventListener("click", () => {
       mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
 
       document.getElementById("status").innerText =
-        "📍 Posizione acquisita – premi Avvia ricerca";
+        "📍 Posizione acquisita — premi Avvia ricerca";
     },
     () => {
       document.getElementById("status").innerText =
@@ -212,7 +370,6 @@ document.getElementById("btn-map").addEventListener("click", () => {
     "🗺️ Tocca un punto sulla mappa";
 });
 
-
 /*************************************************
  * CLICK SULLA MAPPA
  *************************************************/
@@ -220,7 +377,8 @@ map.on("click", e => {
   if (!modalitaSceltaMappa) return;
 
   modalitaSceltaMappa = false;
-disabilitaCursoreSelezione(); // 👈 TORNA CURSORE NORMALE
+  disabilitaCursoreSelezione();
+  
   puntoRicerca = {
     lat: e.latlng.lat,
     lon: e.latlng.lng
@@ -229,7 +387,7 @@ disabilitaCursoreSelezione(); // 👈 TORNA CURSORE NORMALE
   mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
 
   document.getElementById("status").innerText =
-    "📍 Punto selezionato – premi Avvia ricerca";
+    "📍 Punto selezionato — premi Avvia ricerca";
 });
 
 /*************************************************

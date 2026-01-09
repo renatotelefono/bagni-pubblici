@@ -97,3 +97,14 @@ html, body {
 #header {
   position: relative;
 }
+.custom-icon {
+  font-size: 24px;
+  text-align: center;
+  line-height: 30px;
+  background: transparent;
+  border: none;
+}
+
+#category {
+  min-width: 150px;
+}
