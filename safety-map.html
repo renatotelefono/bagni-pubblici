@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Safety Heatmap</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { 
+      margin: 0; 
+      padding: 0; 
+      font-family: Arial, sans-serif; 
+    }
+    #map { 
+      height: 100vh; 
+      width: 100%; 
+    }
+    .info { 
+      position: absolute; 
+      top: 10px; 
+      right: 10px; 
+      background: white; 
+      padding: 15px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+      z-index: 1000;
+      max-width: 250px;
+    }
+    .legend { 
+      position: absolute; 
+      bottom: 30px; 
+      right: 10px; 
+      background: white; 
+      padding: 15px;
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+      z-index: 1000; 
+    }
+    .legend div {
+      margin: 5px 0;
+    }
+    .loading { 
+      position: absolute; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%);
+      background: white; 
+      padding: 30px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      z-index: 2000; 
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">
+    <h3>⏳ Loading data...</h3>
+  </div>
+
+  <div class="info">
+    <h3>🗺️ Safety Map</h3>
+    <p><strong>Total Cells:</strong> <span id="count">-</span></p>
+    <p><strong>Selected:</strong> <span id="selected">Click on hexagon</span></p>
+  </div>
+
+  <div class="legend">
+    <h4>Risk Level</h4>
+    <div>🟢 Safe (70-100)</div>
+    <div>🟠 Medium (40-69)</div>
+    <div>🔴 Dangerous (0-39)</div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Load JavaScript libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/h3-js@4.1.0/dist/h3-js.umd.js"></script>
+
+  <script>
+    // ============================================
+    // CONFIGURAZIONE - MODIFICA QUESTE DUE RIGHE
+    // ============================================
+    const SUPABASE_URL = 'https://hkvhsjfyquoqmdeodkfl.supabase.co'
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrdmhzamZ5cXVvcW1kZW9ka2ZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MjU3MjAsImV4cCI6MjA4MzMwMTcyMH0.iXn3LLiTOWShDsfftKd8WkEe35xOhCFyuCSnOWgLmgg'
+
+    // ============================================
+    // INIZIALIZZAZIONE
+    // ============================================
+    console.log('✅ Script loaded')
+    console.log('📍 URL:', SUPABASE_URL)
+
+    // Crea client Supabase
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    
+    // Crea mappa Leaflet centrata su Roma con zoom maggiore
+    const map = L.map('map').setView([41.9028, 12.4964], 14)
+    
+    // Aggiungi layer OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 18
+    }).addTo(map)
+
+    // ============================================
+    // FUNZIONE PRINCIPALE - CARICA E VISUALIZZA DATI
+    // ============================================
+    async function loadData() {
+      try {
+        console.log('🔄 Loading data from Supabase...')
+        
+        // Query database
+        const { data, error } = await dbClient
+          .from('incidents_h3_aggregated')
+          .select('*')
+          .limit(1000)
+        
+        console.log('📊 Query result:', { 
+          records: data?.length, 
+          error: error?.message 
+        })
+        
+        // Gestione errori
+        if (error) {
+          throw new Error(`Database error: ${error.message}`)
+        }
+        
+        if (!data || data.length === 0) {
+          document.getElementById('loading').innerHTML = '<h3>⚠️ No data found</h3>'
+          return
+        }
+
+        // Dati caricati con successo
+        console.log('✅ Successfully loaded', data.length, 'cells')
+        document.getElementById('count').textContent = data.length
+        document.getElementById('loading').style.display = 'none'
+
+        // Renderizza esagoni
+        let rendered = 0
+        let errors = 0
+
+        data.forEach(cell => {
+          try {
+            // Converti H3 index in coordinate del poligono (false = formato Leaflet)
+            const boundary = h3.cellToBoundary(cell.h3_index, false)
+            
+            // Determina colore in base al danger score
+            // Scala più distribuita
+const color = cell.danger_score >= 95 ? '#2ecc71' :  // Verde solo per >95 (quasi perfetto)
+             cell.danger_score >= 90 ? '#95e1d3' :  // Verde chiaro 85-95
+             cell.danger_score >= 88? '#f9ca24' :  // Giallo 75-85
+             cell.danger_score >= 80? '#f39c12' :  // Arancione 65-75
+             '#e74c3c'                               // Rosso <65
+            
+            // Crea poligono Leaflet con stile ben visibile
+            const polygon = L.polygon(boundary, {
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.85,
+              weight: 2,
+              opacity: 1.0
+            })
+            
+            // Aggiungi popup con dettagli
+            polygon.bindPopup(`
+              <div style="min-width: 200px;">
+                <h4 style="margin: 0 0 10px 0; color: ${color};">
+                  ${cell.risk_category.toUpperCase()}
+                </h4>
+                <strong>H3 Index:</strong> ${cell.h3_index}<br>
+                <strong>Incidents:</strong> ${cell.total_incidents}<br>
+                <strong>Deaths:</strong> ${cell.total_deaths || 0}<br>
+                <strong>Serious Injuries:</strong> ${cell.total_serious_injuries || 0}<br>
+                <strong>Light Injuries:</strong> ${cell.total_light_injuries || 0}<br>
+                <hr style="margin: 10px 0;">
+                <strong>Safety Score:</strong> ${cell.danger_score} / 100<br>
+              </div>
+            `)
+            
+            // Evento click per aggiornare info panel
+            polygon.on('click', () => {
+              document.getElementById('selected').innerHTML = `
+                <strong style="color: ${color}">${cell.risk_category.toUpperCase()}</strong><br>
+                ${cell.total_incidents} incidents<br>
+                ${cell.total_deaths || 0} deaths<br>
+                Score: ${cell.danger_score}/100
+              `
+            })
+            
+            // Aggiungi direttamente alla mappa
+            polygon.addTo(map)
+            rendered++
+            
+          } catch (e) {
+            console.error('❌ Error rendering cell:', cell.h3_index, e.message)
+            errors++
+          }
+        })
+        
+        console.log(`✅ Rendered ${rendered} hexagons (${errors} errors)`)
+        
+        // Se non ci sono errori, mostra messaggio di successo
+        if (rendered > 0 && errors === 0) {
+          console.log('🎉 All hexagons rendered successfully!')
+        }
+        
+      } catch (err) {
+        console.error('❌ Fatal error:', err)
+        document.getElementById('loading').innerHTML = `
+          <h3>❌ Error</h3>
+          <p>${err.message}</p>
+          <button onclick="location.reload()" style="padding: 10px 20px; cursor: pointer;">
+            Retry
+          </button>
+        `
+      }
+    }
+
+    // ============================================
+    // AVVIO AUTOMATICO
+    // ============================================
+    loadData()
+  </script>
+</body>
+</html>
