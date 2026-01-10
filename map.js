@@ -8,6 +8,15 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 /*************************************************
+ * TEST DEBUG H3
+ *************************************************/
+console.log('H3 disponibile?', typeof h3 !== 'undefined');
+if (typeof h3 !== 'undefined') {
+  console.log('Versione H3:', h3.h3GetResolution ? 'v3' : 'v4');
+  console.log('Oggetto H3:', h3);
+}
+
+/*************************************************
  * VARIABILI GLOBALI
  *************************************************/
 let raggio = 3000;                // metri
@@ -175,7 +184,7 @@ if (categorySelect) {
     }
     
     document.getElementById("status").innerText =
-      `Categoria: ${cat.nome} — seleziona posizione e avvia ricerca`;
+      `Categoria: ${cat.nome} – seleziona posizione e avvia ricerca`;
   });
 }
 
@@ -194,14 +203,17 @@ if (radiusSelect) {
     }
 
     document.getElementById("status").innerText =
-      `Raggio impostato a ${raggio / 1000} km — premi Avvia ricerca`;
+      `Raggio impostato a ${raggio / 1000} km – premi Avvia ricerca`;
   });
 }
 
 /*************************************************
- * ANTEPRIMA: PUNTO + CERCHIO
+ * ANTEPRIMA: PUNTO + ESAGONI H3
  *************************************************/
 function mostraAnteprima(lat, lon) {
+  console.log('=== MOSTRA ANTEPRIMA ===');
+  console.log('Lat:', lat, 'Lon:', lon, 'Raggio:', raggio);
+  
   // rimuove anteprima precedente
   if (markerPreview) map.removeLayer(markerPreview);
   if (circlePreview) map.removeLayer(circlePreview);
@@ -217,13 +229,57 @@ function mostraAnteprima(lat, lon) {
     .bindPopup("📍 Punto selezionato")
     .openPopup();
 
-  // cerchio raggio
-  circlePreview = L.circle([lat, lon], {
-    radius: raggio,
-    color: "orange",
-    fillColor: "orange",
-    fillOpacity: 0.15
-  }).addTo(map);
+  // Determina risoluzione H3 in base al raggio
+  let resolution;
+  if (raggio <= 1000) {
+    resolution = 9;
+  } else if (raggio <= 3000) {
+    resolution = 8;
+  } else {
+    resolution = 7;
+  }
+  
+  console.log('Risoluzione H3:', resolution);
+  
+  try {
+    // Ottieni cella H3 centrale
+    const h3Index = h3.latLngToCell(lat, lon, resolution);
+    console.log('H3 Index:', h3Index);
+    
+    // Calcola quanti anelli servono
+    const avgEdgeLength = h3.getHexagonEdgeLengthAvg(resolution, h3.UNITS.m);
+    const k = Math.ceil(raggio / avgEdgeLength);
+    console.log('Edge length:', avgEdgeLength, 'K-ring:', k);
+    
+    // Ottieni celle nel raggio
+    const hexagons = h3.gridDisk(h3Index, k);
+    console.log('Numero esagoni:', hexagons.length);
+
+    // Disegna esagoni
+    circlePreview = L.layerGroup();
+    
+    hexagons.forEach((hex, index) => {
+      const boundary = h3.cellToBoundary(hex);
+      const leafletBoundary = boundary.map(coord => [coord[0], coord[1]]);
+      
+      const polygon = L.polygon(leafletBoundary, {
+        color: "orange",
+        fillColor: "orange",
+        fillOpacity: 0.15,
+        weight: 2
+      });
+      
+      polygon.addTo(circlePreview);
+    });
+    
+    console.log('Esagoni disegnati:', hexagons.length);
+    circlePreview.addTo(map);
+    console.log('Layer aggiunto alla mappa');
+    
+  } catch (error) {
+    console.error('Errore H3:', error);
+    console.error('Stack:', error.stack);
+  }
 
   map.setView([lat, lon], 15);
 }
@@ -292,33 +348,130 @@ out body;
 }
 
 /*************************************************
- * MOSTRA RISULTATI
+ * MOSTRA RISULTATI CON CLUSTERING H3
  *************************************************/
 function mostraRisultati(data) {
+  console.log('=== MOSTRA RISULTATI ===');
+  console.log('Elementi ricevuti:', data.elements.length);
+  
+  // Rimuovi TUTTO: anteprima + risultati precedenti
+  if (markerPreview) map.removeLayer(markerPreview);
+  if (circlePreview) map.removeLayer(circlePreview);
+  if (layerRisultati) map.removeLayer(layerRisultati);
+  
   layerRisultati = L.layerGroup();
   
   const cat = categorie[categoriaSelezionata];
 
+  if (data.elements.length === 0) {
+    document.getElementById("status").innerText =
+      `${cat.emoji} Nessun risultato trovato`;
+    return;
+  }
+
+  // Determina risoluzione H3
+  let resolution;
+  if (raggio <= 1000) {
+    resolution = 9;
+  } else if (raggio <= 3000) {
+    resolution = 8;
+  } else {
+    resolution = 7;
+  }
+  console.log('Risoluzione H3 per risultati:', resolution);
+
+  // Mantieni il marker del punto selezionato
+  if (puntoRicerca) {
+    markerPreview = L.circleMarker([puntoRicerca.lat, puntoRicerca.lon], {
+      radius: 8,
+      color: "red",
+      fillColor: "red",
+      fillOpacity: 0.9
+    })
+      .addTo(map)
+      .bindPopup("📍 Punto di ricerca");
+  }
+
+  // Raggruppa risultati per cella H3
+  const cellGroups = {};
+
   data.elements.forEach(el => {
     if (!el.lat || !el.lon) return;
 
-    const popup = cat.popup(el.tags || {});
-
-    const icon = L.divIcon({
-      html: cat.emoji,
-      className: 'custom-icon',
-      iconSize: [30, 30]
-    });
-
-    L.marker([el.lat, el.lon], { icon })
-      .bindPopup(popup)
-      .addTo(layerRisultati);
+    const h3Index = h3.latLngToCell(el.lat, el.lon, resolution);
+    
+    if (!cellGroups[h3Index]) {
+      cellGroups[h3Index] = [];
+    }
+    cellGroups[h3Index].push(el);
   });
 
+  console.log('Celle H3 con risultati:', Object.keys(cellGroups).length);
+
+  // Visualizza celle con risultati
+  let esagoniDisegnati = 0;
+  Object.entries(cellGroups).forEach(([hexId, elements]) => {
+    const count = elements.length;
+    
+    // Disegna esagono colorato
+    const boundary = h3.cellToBoundary(hexId);
+    const leafletBoundary = boundary.map(coord => [coord[0], coord[1]]);
+    
+    // Colore in base al numero di risultati
+    let color, fillOpacity;
+    if (count === 1) {
+      color = "#4CAF50";  // verde
+      fillOpacity = 0.4;
+    } else if (count <= 3) {
+      color = "#FF9800";  // arancione
+      fillOpacity = 0.5;
+    } else {
+      color = "#F44336";  // rosso
+      fillOpacity = 0.6;
+    }
+    
+    const hexPolygon = L.polygon(leafletBoundary, {
+      color: color,
+      fillColor: color,
+      fillOpacity: fillOpacity,
+      weight: 3
+    });
+
+    // Popup con dettagli
+    let popup = `<div style="max-height: 300px; overflow-y: auto;">`;
+    popup += `<strong>${cat.emoji} ${count} ${cat.nome} in questa zona</strong><br><hr>`;
+    
+    elements.forEach((el, idx) => {
+      popup += cat.popup(el.tags || {});
+      if (idx < elements.length - 1) popup += "<hr>";
+    });
+    popup += `</div>`;
+
+    hexPolygon.bindPopup(popup);
+    hexPolygon.addTo(layerRisultati);
+    esagoniDisegnati++;
+
+    // Aggiungi marker individuali
+    elements.forEach(el => {
+      const icon = L.divIcon({
+        html: cat.emoji,
+        className: 'custom-icon',
+        iconSize: [30, 30]
+      });
+
+      L.marker([el.lat, el.lon], { icon })
+        .bindPopup(cat.popup(el.tags || {}))
+        .addTo(layerRisultati);
+    });
+  });
+
+  console.log('Esagoni disegnati totali:', esagoniDisegnati);
+  
   layerRisultati.addTo(map);
+  console.log('Layer risultati aggiunto alla mappa');
 
   document.getElementById("status").innerText =
-    `${cat.emoji} ${cat.nome} trovati: ${data.elements.length}`;
+    `${cat.emoji} Trovati ${data.elements.length} risultati in ${Object.keys(cellGroups).length} zone`;
 }
 
 /*************************************************
@@ -346,7 +499,7 @@ document.getElementById("btn-gps").addEventListener("click", () => {
       mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
 
       document.getElementById("status").innerText =
-        "📍 Posizione acquisita — premi Avvia ricerca";
+        "📍 Posizione acquisita – premi Avvia ricerca";
     },
     () => {
       document.getElementById("status").innerText =
@@ -387,7 +540,7 @@ map.on("click", e => {
   mostraAnteprima(puntoRicerca.lat, puntoRicerca.lon);
 
   document.getElementById("status").innerText =
-    "📍 Punto selezionato — premi Avvia ricerca";
+    "📍 Punto selezionato – premi Avvia ricerca";
 });
 
 /*************************************************
