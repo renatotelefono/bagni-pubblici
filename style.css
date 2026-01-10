@@ -123,3 +123,34 @@ html, body {
   font-size: 10px;
   font-weight: bold;
 }
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Centra le ultime 3 card nella seconda riga */
+.app-grid > a:nth-child(5) {
+  grid-column: 2;
+}
+
+/* Responsive: 2 colonne su tablet */
+@media (max-width: 1024px) {
+  .app-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .app-grid > a:nth-child(5) {
+    grid-column: auto;
+  }
+}
+
+/* Responsive: 1 colonna su mobile */
+@media (max-width: 600px) {
+  .app-grid {
+    grid-template-columns: 1fr;
+  }
+}

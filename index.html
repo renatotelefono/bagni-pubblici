@@ -37,11 +37,17 @@
       text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
 
-    .app-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-    }
+   .app-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+
+
 
     .app-card {
       background: white;
@@ -118,33 +124,34 @@
       </a>
       
       <a href="aria.html" class="app-card">
-      
         <div class="app-icon">🏭</div>
         <div class="app-title">ARIA nel mondo</div>
-        <div class="app-description">inquinamento nel mondo</div>
-        </a>
+        <div class="app-description">Inquinamento nel mondo</div>
+      </a>
      
- <a href="mappa_pericolosita.html" class="app-card">
-      
+      <a href="mappa_pericolosita.html" class="app-card">
         <div class="app-icon">👮</div>
         <div class="app-title">Crimini</div>
         <div class="app-description">Il crimine in Italia</div>
-       </a>
-        <a href="safety-map.html" class="app-card">
+      </a>
       
-        <div class="app-icon">🚗</div>
+      <a href="safety-map.html" class="app-card">
+        <div class="app-icon">⚠️</div>
         <div class="app-title">Incidenti H3</div>
-        <div class="app-description">Visualizza gli incidenti stradali a Roma nel 2022</div>
-       </a>
- <a href="ricerca-luoghi.html" class="app-card">
+        <div class="app-description">Incidenti stradali a Roma con visualizzazione H3</div>
+      </a>
       
-        <div class="app-icon">🔎</div>
-        <div class="app-title">ricerca luoghi</div>
-        <div class="app-description">Visualizza luoghi che possono essere di interesse</div>
-       </a>
-
-
-      </div>
+      <a href="ricerca-luoghi.html" class="app-card">
+        <div class="app-icon">🔍</div>
+        <div class="app-title">Ricerca Luoghi</div>
+        <div class="app-description">Trova luoghi di interesse nelle vicinanze</div>
+      </a>
+      
+      <a href="densita-edifici.html" class="app-card">
+        <div class="app-icon">🏘️</div>
+        <div class="app-title">Densità Edifici</div>
+        <div class="app-description">Analizza l'antropizzazione del territorio</div>
+      </a>
     </div>
   </div>
 </body>
