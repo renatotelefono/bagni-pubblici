@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Luoghi di Culto</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            max-width: 250px;
+        }
+        .filter-section {
+            margin-bottom: 15px;
+        }
+        .filter-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #333;
+        }
+        .filter-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        button {
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-align: left;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.active {
+            background: #28a745;
+        }
+        .load-button {
+            background: #dc3545;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .load-button:hover {
+            background: #c82333;
+        }
+        #loading {
+            display: none;
+            margin-top: 10px;
+            color: #666;
+            font-size: 12px;
+        }
+        .legend {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid white;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div class="filter-section">
+            <h3>🏛️ Filtro Religione</h3>
+            <div class="filter-buttons">
+                <button id="btn-all" class="active" onclick="setFilter('all')">🌍 Tutte le religioni</button>
+                <button id="btn-christian" onclick="setFilter('christian')">✝️ Cristiane (tutte)</button>
+                <button id="btn-catholic" onclick="setFilter('catholic')">⛪ Cattoliche</button>
+                <button id="btn-orthodox" onclick="setFilter('orthodox')">☦️ Ortodosse</button>
+                <button id="btn-protestant" onclick="setFilter('protestant')">📖 Protestanti</button>
+                <button id="btn-muslim" onclick="setFilter('muslim')">🕌 Musulmane</button>
+                <button id="btn-jewish" onclick="setFilter('jewish')">✡️ Ebraiche</button>
+                <button id="btn-buddhist" onclick="setFilter('buddhist')">☸️ Buddiste</button>
+                <button id="btn-hindu" onclick="setFilter('hindu')">🕉️ Induiste</button>
+            </div>
+        </div>
+        
+        <button class="load-button" onclick="caricaLuoghiCulto()">📍 Carica Luoghi di Culto</button>
+        <div id="loading">⏳ Caricamento in corso...</div>
+        
+        <div class="legend">
+            <strong>Legenda colori:</strong>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #FFD700;"></div>
+                <span>Cattolici</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #FF6347;"></div>
+                <span>Ortodossi</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #9370DB;"></div>
+                <span>Protestanti</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4169E1;"></div>
+                <span>Altri cristiani</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #228B22;"></div>
+                <span>Musulmani</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #1E90FF;"></div>
+                <span>Ebrei</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #FF8C00;"></div>
+                <span>Buddisti</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #FF1493;"></div>
+                <span>Induisti</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #808080;"></div>
+                <span>Altri/Non specificato</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Inizializza la mappa centrata su Roma
+        const map = L.map('map').setView([41.9028, 12.4964], 13);
+        
+        // Aggiungi il layer della mappa di base
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Layer per i marker
+        let markersLayer = L.layerGroup().addTo(map);
+        
+        // Filtro corrente
+        let currentFilter = 'all';
+
+        // Funzione per impostare il filtro
+        function setFilter(filter) {
+            currentFilter = filter;
+            
+            // Aggiorna i pulsanti
+            document.querySelectorAll('.filter-buttons button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`btn-${filter}`).classList.add('active');
+        }
+
+        // Funzione per verificare se un elemento passa il filtro
+        function passFilter(religion, denomination) {
+            if (currentFilter === 'all') return true;
+            if (currentFilter === 'christian') return religion === 'christian';
+            if (currentFilter === 'catholic') return religion === 'christian' && denomination === 'catholic';
+            if (currentFilter === 'orthodox') return religion === 'christian' && denomination === 'orthodox';
+            if (currentFilter === 'protestant') return religion === 'christian' && denomination === 'protestant';
+            if (currentFilter === 'muslim') return religion === 'muslim';
+            if (currentFilter === 'jewish') return religion === 'jewish';
+            if (currentFilter === 'buddhist') return religion === 'buddhist';
+            if (currentFilter === 'hindu') return religion === 'hindu';
+            return false;
+        }
+
+        // Funzione per ottenere il colore dell'icona
+        function getIconColor(religion, denomination) {
+            if (religion === 'christian') {
+                if (denomination === 'catholic') return '#FFD700'; // oro per cattolici
+                if (denomination === 'orthodox') return '#FF6347'; // rosso per ortodossi
+                if (denomination === 'protestant') return '#9370DB'; // viola per protestanti
+                return '#4169E1'; // blu per altri cristiani
+            }
+            if (religion === 'muslim') return '#228B22'; // verde per musulmani
+            if (religion === 'jewish') return '#1E90FF'; // azzurro per ebrei
+            if (religion === 'buddhist') return '#FF8C00'; // arancione per buddisti
+            if (religion === 'hindu') return '#FF1493'; // rosa per induisti
+            return '#808080'; // grigio default
+        }
+
+        // Funzione per caricare i luoghi di culto
+        async function caricaLuoghiCulto() {
+            // Mostra indicatore di caricamento
+            document.getElementById('loading').style.display = 'block';
+            
+            // Pulisci i marker esistenti
+            markersLayer.clearLayers();
+            
+            // Ottieni i bounds della mappa visibile
+            const bounds = map.getBounds();
+            const bbox = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+            
+            // Query Overpass
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["amenity"="place_of_worship"](${bbox});
+                  way["amenity"="place_of_worship"](${bbox});
+                  relation["amenity"="place_of_worship"](${bbox});
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+            
+            const url = 'https://overpass-api.de/api/interpreter';
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: query
+                });
+                
+                const data = await response.json();
+                
+                // Crea una mappa per i nodes
+                const nodes = {};
+                data.elements.forEach(element => {
+                    if (element.type === 'node') {
+                        nodes[element.id] = { lat: element.lat, lon: element.lon };
+                    }
+                });
+                
+                // Processa i risultati
+                let count = 0;
+                let filteredCount = 0;
+                
+                data.elements.forEach(element => {
+                    let lat, lon, name, religion, denomination;
+                    
+                    // Gestisci nodes
+                    if (element.type === 'node' && element.tags) {
+                        lat = element.lat;
+                        lon = element.lon;
+                    }
+                    // Gestisci ways
+                    else if (element.type === 'way' && element.tags) {
+                        if (element.center) {
+                            lat = element.center.lat;
+                            lon = element.center.lon;
+                        } else if (element.nodes && element.nodes.length > 0) {
+                            let sumLat = 0, sumLon = 0, validNodes = 0;
+                            element.nodes.forEach(nodeId => {
+                                if (nodes[nodeId]) {
+                                    sumLat += nodes[nodeId].lat;
+                                    sumLon += nodes[nodeId].lon;
+                                    validNodes++;
+                                }
+                            });
+                            if (validNodes > 0) {
+                                lat = sumLat / validNodes;
+                                lon = sumLon / validNodes;
+                            } else {
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+                    // Gestisci relations
+                    else if (element.type === 'relation' && element.tags && element.center) {
+                        lat = element.center.lat;
+                        lon = element.center.lon;
+                    }
+                    else {
+                        return;
+                    }
+                    
+                    // Estrai informazioni
+                    name = element.tags?.name || 'Senza nome';
+                    religion = element.tags?.religion || '';
+                    denomination = element.tags?.denomination || '';
+                    
+                    count++;
+                    
+                    // Applica filtro
+                    if (!passFilter(religion, denomination)) {
+                        return;
+                    }
+                    
+                    filteredCount++;
+                    
+                    // Ottieni colore icona
+                    const iconColor = getIconColor(religion, denomination);
+                    
+                    // Crea marker personalizzato
+                    const icon = L.divIcon({
+                        html: `<div style="background-color: ${iconColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+                        className: 'custom-marker',
+                        iconSize: [14, 14]
+                    });
+                    
+                    // Crea popup con informazioni
+                    const popupContent = `
+                        <strong>${name}</strong><br>
+                        <em>Tipo:</em> ${element.type}<br>
+                        ${religion ? `<em>Religione:</em> ${religion}<br>` : ''}
+                        ${denomination ? `<em>Denominazione:</em> ${denomination}<br>` : ''}
+                        <a href="https://www.openstreetmap.org/${element.type}/${element.id}" target="_blank">Vedi su OSM</a>
+                    `;
+                    
+                    // Aggiungi marker alla mappa
+                    L.marker([lat, lon], { icon: icon })
+                        .bindPopup(popupContent)
+                        .addTo(markersLayer);
+                });
+                
+                console.log(`Totali: ${count}, Visualizzati: ${filteredCount}`);
+                alert(`Trovati ${count} luoghi di culto.\nVisualizzati ${filteredCount} con filtro "${currentFilter}".`);
+                
+            } catch (error) {
+                console.error('Errore nel caricamento:', error);
+                alert('Errore nel caricamento dei dati. Riprova.');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
