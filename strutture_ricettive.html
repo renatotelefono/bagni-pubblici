@@ -376,38 +376,68 @@
             return { marker: marker, data: structure };
         }
         
-        async function loadData() {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('strutture_ricettive')
-                    .select('*')
-                    .not('latitude', 'is', null)
-                    .not('longitude', 'is', null);
-                
-                if (error) throw error;
-                
-                structuresData = data;
-                
-                const tipologie = [...new Set(data.map(s => s.tipologia).filter(t => t))].sort();
-                const tipologiaSelect = document.getElementById('tipologiaFilter');
-                tipologie.forEach(tipo => {
-                    const option = document.createElement('option');
-                    option.value = tipo;
-                    option.textContent = tipo;
-                    tipologiaSelect.appendChild(option);
-                });
-                
-                document.getElementById('totalStructures').textContent = `Totale: ${data.length}`;
-                renderMarkers();
-                
-            } catch (error) {
-                console.error('Errore:', error);
-                document.getElementById('errorContainer').innerHTML = 
-                    `<div class="error">❌ Errore: ${error.message}</div>`;
-                document.getElementById('totalStructures').textContent = 'Errore nel caricamento';
+async function loadData() {
+    try {
+        let allData = [];
+        let from = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+        
+        console.log('📥 Caricamento dati in corso...');
+        document.getElementById('totalStructures').innerHTML = 'Totale: <span class="loading">Caricamento...</span>';
+        
+        // Carica in blocchi di 1000
+        while (hasMore) {
+            const { data, error, count } = await supabaseClient
+                .from('strutture_ricettive')
+                .select('*', { count: 'exact' })
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null)
+                .range(from, from + batchSize - 1);
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                allData = allData.concat(data);
+                console.log(`✓ Caricati ${allData.length} record...`);
+                document.getElementById('totalStructures').textContent = `Totale: ${allData.length} (caricamento...)`;
+                from += batchSize;
+            }
+            
+            // Se abbiamo ricevuto meno di batchSize record, abbiamo finito
+            if (!data || data.length < batchSize) {
+                hasMore = false;
             }
         }
         
+        structuresData = allData;
+        console.log(`✅ Caricamento completato: ${allData.length} record`);
+        
+        // Popola filtro tipologie
+        const tipologie = [...new Set(allData.map(s => s.tipologia).filter(t => t))].sort();
+        const tipologiaSelect = document.getElementById('tipologiaFilter');
+        tipologie.forEach(tipo => {
+            const option = document.createElement('option');
+            option.value = tipo;
+            option.textContent = tipo;
+            tipologiaSelect.appendChild(option);
+        });
+        
+        // Aggiorna statistiche
+        document.getElementById('totalStructures').textContent = `Totale: ${allData.length}`;
+        
+        // Renderizza markers
+        console.log('🗺️ Rendering markers...');
+        renderMarkers();
+        console.log('✅ Tutto pronto!');
+        
+    } catch (error) {
+        console.error('Errore:', error);
+        document.getElementById('errorContainer').innerHTML = 
+            `<div class="error">❌ Errore: ${error.message}</div>`;
+        document.getElementById('totalStructures').textContent = 'Errore nel caricamento';
+    }
+}
         function renderMarkers() {
             allMarkers.forEach(m => map.removeLayer(m.marker));
             allMarkers = [];
