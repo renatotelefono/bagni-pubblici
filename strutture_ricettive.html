@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Strutture Ricettive - Roma</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #map { 
+            height: 100vh; 
+            width: 100%; 
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 280px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .info-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .filter-section {
+            margin-bottom: 12px;
+        }
+        
+        .filter-section label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .filter-section select, .filter-section input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+        
+        .checkbox-item input {
+            margin-right: 4px;
+            width: auto;
+        }
+        
+        .stats {
+            font-size: 13px;
+            color: #666;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .stats div {
+            margin-bottom: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .leaflet-popup-content {
+            min-width: 250px;
+        }
+        
+        .popup-title {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .popup-info {
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        
+        .popup-info strong {
+            color: #555;
+        }
+        
+        .popup-services {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        
+        .service-tag {
+            display: inline-block;
+            background: #e8f4f8;
+            color: #0066cc;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin: 2px;
+        }
+        
+        .legend {
+            background: white;
+            padding: 12px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+        
+        .btn-reset {
+            width: 100%;
+            padding: 8px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        
+        .btn-reset:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="info-panel">
+        <h3>🏨 Strutture Ricettive</h3>
+        
+        <div id="errorContainer"></div>
+        
+        <div class="filter-section">
+            <label for="searchInput">🔍 Cerca:</label>
+            <input type="text" id="searchInput" placeholder="Nome struttura...">
+        </div>
+        
+        <div class="filter-section">
+            <label for="tipologiaFilter">Tipologia:</label>
+            <select id="tipologiaFilter">
+                <option value="all">Tutte</option>
+            </select>
+        </div>
+        
+        <div class="filter-section">
+            <label for="stelleFilter">Stelle:</label>
+            <select id="stelleFilter">
+                <option value="all">Tutte</option>
+                <option value="1">⭐ 1 Stella</option>
+                <option value="2">⭐ 2 Stelle</option>
+                <option value="3">⭐ 3 Stelle</option>
+                <option value="4">⭐ 4 Stelle</option>
+                <option value="5">⭐ 5 Stelle</option>
+            </select>
+        </div>
+        
+        <div class="filter-section">
+            <label>Servizi:</label>
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="wifiFilter">
+                    <label for="wifiFilter">WiFi</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="piscinaFilter">
+                    <label for="piscinaFilter">Piscina</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="parcheggioFilter">
+                    <label for="parcheggioFilter">Parcheggio</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="ristoranteFilter">
+                    <label for="ristoranteFilter">Ristorante</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="disabiliFilter">
+                    <label for="disabiliFilter">Accessibile</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="animaliFilter">
+                    <label for="animaliFilter">Animali</label>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn-reset" id="btnReset">Azzera Filtri</button>
+        
+        <div class="stats">
+            <div id="totalStructures">Totale: <span class="loading">Caricamento...</span></div>
+            <div id="visibleStructures">Visualizzate: 0</div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script>
+        // Verifica config
+        if (typeof CONFIG === 'undefined') {
+            document.getElementById('errorContainer').innerHTML = 
+                '<div class="error">❌ File config.js non trovato.</div>';
+            throw new Error('Config non caricato');
+        }
+        
+        // ========== VARIABILI GLOBALI (DICHIARATE SUBITO!) ==========
+        let allMarkers = [];
+        let structuresData = [];
+        
+        // ========== CONFIGURAZIONE SUPABASE ==========
+        const { createClient } = window.supabase;
+        const supabaseClient = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        
+        // ========== INIZIALIZZA MAPPA ==========
+        const map = L.map('map').setView([41.9028, 12.4964], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // ========== LEGENDA ==========
+        const legend = L.control({position: 'bottomleft'});
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <div class="legend-title">Tipologie</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span>Hotel</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span>Guest House / B&B</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #2ecc71;"></div>
+                    <span>Casa Vacanza</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #9b59b6;"></div>
+                    <span>Residence</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f39c12;"></div>
+                    <span>Altro</span>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+        
+        // ========== FUNZIONI ==========
+        function getColor(tipologia) {
+            if (!tipologia) return '#95a5a6';
+            
+            const tipo = tipologia.toLowerCase();
+            if (tipo.includes('hotel')) return '#e74c3c';
+            if (tipo.includes('guest house') || tipo.includes('affittacamere') || tipo.includes('b&b') || tipo.includes('bed')) return '#3498db';
+            if (tipo.includes('casa vacanza')) return '#2ecc71';
+            if (tipo.includes('residence')) return '#9b59b6';
+            if (tipo.includes('ostello')) return '#e67e22';
+            return '#f39c12';
+        }
+        
+        function createMarker(structure) {
+            const lat = parseFloat(structure.latitude);
+            const lon = parseFloat(structure.longitude);
+            
+            if (isNaN(lat) || isNaN(lon)) return null;
+            
+            const marker = L.circleMarker([lat, lon], {
+                radius: 8,
+                fillColor: getColor(structure.tipologia),
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+            
+            const servizi = [];
+            if (structure.copertura_wifi) servizi.push('WiFi');
+            if (structure.piscina) servizi.push('Piscina');
+            if (structure.parcheggio_custodito) servizi.push('Parcheggio');
+            if (structure.ristorante) servizi.push('Ristorante');
+            if (structure.aria_condizionata) servizi.push('Aria Condizionata');
+            if (structure.bar) servizi.push('Bar');
+            if (structure.accessibile_disabili) servizi.push('Accessibile');
+            if (structure.accetta_animali_piccola_taglia) servizi.push('Animali ammessi');
+            
+            const serviziHTML = servizi.length > 0 
+                ? `<div class="popup-services">
+                     ${servizi.map(s => `<span class="service-tag">${s}</span>`).join('')}
+                   </div>`
+                : '';
+            
+            const popupContent = `
+                <div class="popup-title">${structure.denominazione || 'N/A'}</div>
+                <div class="popup-info">
+                    <strong>Tipologia:</strong> ${structure.tipologia || 'N/A'}<br>
+                    <strong>Indirizzo:</strong> ${structure.via || ''} ${structure.civico || ''}<br>
+                    ${structure.stelle ? `<strong>Stelle:</strong> ${'⭐'.repeat(parseInt(structure.stelle))}<br>` : ''}
+                    ${structure.totale_posti_letto ? `<strong>Posti letto:</strong> ${structure.totale_posti_letto}<br>` : ''}
+                    ${structure.totale_numero_camere ? `<strong>Camere:</strong> ${structure.totale_numero_camere}<br>` : ''}
+                    ${structure.contatto_telefono ? `<strong>Tel:</strong> <a href="tel:${structure.contatto_telefono}">${structure.contatto_telefono}</a><br>` : ''}
+                    ${structure.contatto_cellulare ? `<strong>Cell:</strong> <a href="tel:${structure.contatto_cellulare}">${structure.contatto_cellulare}</a><br>` : ''}
+                    ${structure.contatto_email ? `<strong>Email:</strong> <a href="mailto:${structure.contatto_email}">${structure.contatto_email}</a><br>` : ''}
+                    ${structure.contatto_website ? `<strong>Web:</strong> <a href="${structure.contatto_website}" target="_blank">Visita sito</a><br>` : ''}
+                    ${serviziHTML}
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            
+            return { marker: marker, data: structure };
+        }
+        
+        async function loadData() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('strutture_ricettive')
+                    .select('*')
+                    .not('latitude', 'is', null)
+                    .not('longitude', 'is', null);
+                
+                if (error) throw error;
+                
+                structuresData = data;
+                
+                const tipologie = [...new Set(data.map(s => s.tipologia).filter(t => t))].sort();
+                const tipologiaSelect = document.getElementById('tipologiaFilter');
+                tipologie.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo;
+                    option.textContent = tipo;
+                    tipologiaSelect.appendChild(option);
+                });
+                
+                document.getElementById('totalStructures').textContent = `Totale: ${data.length}`;
+                renderMarkers();
+                
+            } catch (error) {
+                console.error('Errore:', error);
+                document.getElementById('errorContainer').innerHTML = 
+                    `<div class="error">❌ Errore: ${error.message}</div>`;
+                document.getElementById('totalStructures').textContent = 'Errore nel caricamento';
+            }
+        }
+        
+        function renderMarkers() {
+            allMarkers.forEach(m => map.removeLayer(m.marker));
+            allMarkers = [];
+            
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const tipologiaFilter = document.getElementById('tipologiaFilter').value;
+            const stelleFilter = document.getElementById('stelleFilter').value;
+            const wifiFilter = document.getElementById('wifiFilter').checked;
+            const piscinaFilter = document.getElementById('piscinaFilter').checked;
+            const parcheggioFilter = document.getElementById('parcheggioFilter').checked;
+            const ristoranteFilter = document.getElementById('ristoranteFilter').checked;
+            const disabiliFilter = document.getElementById('disabiliFilter').checked;
+            const animaliFilter = document.getElementById('animaliFilter').checked;
+            
+            const filtered = structuresData.filter(structure => {
+                if (searchText && !structure.denominazione?.toLowerCase().includes(searchText)) return false;
+                if (tipologiaFilter !== 'all' && structure.tipologia !== tipologiaFilter) return false;
+                if (stelleFilter !== 'all' && structure.stelle != stelleFilter) return false;
+                if (wifiFilter && !structure.copertura_wifi) return false;
+                if (piscinaFilter && !structure.piscina) return false;
+                if (parcheggioFilter && !structure.parcheggio_custodito) return false;
+                if (ristoranteFilter && !structure.ristorante) return false;
+                if (disabiliFilter && !structure.accessibile_disabili) return false;
+                if (animaliFilter && !structure.accetta_animali_piccola_taglia) return false;
+                return true;
+            });
+            
+            filtered.forEach(structure => {
+                const markerObj = createMarker(structure);
+                if (markerObj) {
+                    markerObj.marker.addTo(map);
+                    allMarkers.push(markerObj);
+                }
+            });
+            
+            document.getElementById('visibleStructures').textContent = `Visualizzate: ${allMarkers.length}`;
+            
+            if (allMarkers.length > 0 && filtered.length < structuresData.length) {
+                const group = L.featureGroup(allMarkers.map(m => m.marker));
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+        
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('tipologiaFilter').value = 'all';
+            document.getElementById('stelleFilter').value = 'all';
+            document.getElementById('wifiFilter').checked = false;
+            document.getElementById('piscinaFilter').checked = false;
+            document.getElementById('parcheggioFilter').checked = false;
+            document.getElementById('ristoranteFilter').checked = false;
+            document.getElementById('disabiliFilter').checked = false;
+            document.getElementById('animaliFilter').checked = false;
+            renderMarkers();
+            map.setView([41.9028, 12.4964], 12);
+        }
+        
+        // ========== EVENT LISTENERS ==========
+        document.getElementById('searchInput').addEventListener('input', renderMarkers);
+        document.getElementById('tipologiaFilter').addEventListener('change', renderMarkers);
+        document.getElementById('stelleFilter').addEventListener('change', renderMarkers);
+        document.getElementById('wifiFilter').addEventListener('change', renderMarkers);
+        document.getElementById('piscinaFilter').addEventListener('change', renderMarkers);
+        document.getElementById('parcheggioFilter').addEventListener('change', renderMarkers);
+        document.getElementById('ristoranteFilter').addEventListener('change', renderMarkers);
+        document.getElementById('disabiliFilter').addEventListener('change', renderMarkers);
+        document.getElementById('animaliFilter').addEventListener('change', renderMarkers);
+        document.getElementById('btnReset').addEventListener('click', resetFilters);
+        
+        // ========== AVVIA ==========
+        loadData();
+    </script>
+</body>
+</html>

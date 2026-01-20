@@ -1,0 +1,23 @@
+# Environment variables
+.env
+
+# Generated config
+config.js
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
